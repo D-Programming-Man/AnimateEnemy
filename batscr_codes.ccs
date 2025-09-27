@@ -1,0 +1,6542 @@
+import asm65816
+import AnimateEnemy_Main
+
+/*
+	batscr_codes:
+	-------------
+	This script is the main code file that holds all of the action/movement script-like codes
+	and commands to use in your enemy scripts. If you are familiar with Catador's "movscr_codes", 
+	you'll definitely find some similarity in how I structure and made each command, albiet worded
+	slightly different, maybe even a bit esoteric. I also took inspiration from Cooprock's "Bowspr"
+	script as well as I was developing the Bowspr Battle System, which also uses Action/Movement
+	Scripts in battle.
+	
+	Special Thanks to PhoenixBound for helping me with the original Animate_Enemy_Main and the 
+	other Animate_Enemy and Enemy_Float files. With his assistance on those files, it made me
+	realize how stinky and confusing my original code was and how bad it was to even make new
+	features for it. This script should make enemies do more things and stuff in battle
+	much easier. There's still a ton of room to add or to create more features with, so if you 
+	have an idea you can shoot me up a DM or just mention me in the PK Hack discord: D-Man
+	
+	* HOW TO USE *
+	--------------
+	If you are using the "AnimateEnemy_Main.ccs" file, you can assign an enemy to a "script" label. 
+	Within that script label, you can use these commands to control how you want to display the
+	enemy. For example, if you have an entry in the "AnimateEnemy_Main.ccs" file like so:
+	
+	animated_sprite(38, 8, SIZE_32x32, SIZE_128x64, Other_File.Label)
+	
+	Inside the "Other_File.ccs" file, your "Label" could look something like this:
+	
+	Label: {
+		b_set_frame_random
+		
+		b_set_flying_height(10)
+		b_set_flying_speed(5)
+		b_rand_8bit
+		b_set_flying_counter_result
+		b_toggle_flying(1)
+		
+		b_set_var0(short[0] palette2)
+		b_set_var1(short[1] palette2)
+		b_toggle_palette_cycle(1)
+		b_set_palette_cycle_rate(20)
+	
+	Loop:
+		b_next_frame
+	
+		b_rand_8bit
+		b_and_result(0x0003)
+		b_set_palette_result
+	
+		b_rand_8bit
+		b_and_result(0x0001)
+		b_set_horizontal_result
+	
+		b_rand_8bit
+		b_and_result(0x0001)
+		b_set_vertical_result
+	
+		b_pause(30)
+		b_jmp(Loop)
+	}
+	
+	Don't worry about what any of these means just yet, just know you can go ham and crazy on
+	what you can add do. 
+	
+	
+	
+	* EXAMPLES *
+	------------
+	1. 	I can take a guess that you're mostly here just to animate the enemies, so here's
+		a simple script that will do the bare necessities. Assuming that you have an entry
+		in the "AnimateEnemy_Main" file just like above, you can just animate them like so:
+		
+		Label: {
+		Loop:
+			b_next_frame
+			b_pause(30)
+			b_jmp(Loop)
+		}
+		
+		This advances the enemy to their next frame and then does a 30 frame pause on the
+		script. After that, it jumps back to the "Loop" label inside of the "Label" label
+		to restart the whole script again. 
+		
+		IMPORTANT: 		ALWAYS INCORPORATE A "b_pause()" COMMAND SOMEWHERE WITHIN YOUR LOOP.
+						Reason being is that you'll stall the game and softlock it because
+						the script needs to give back control to the main game and it can only
+						do that in a "b_pause()" command. 
+		
+	2.	If you have used my previous "Animate_Enemy_Main.ccs" file, you'll know that you
+		have to give each entry a "speed" value. That speed value functions very similar
+		to the "b_pause()" command here in this context. However, the speed value limits
+		on the customizability of how you want to display each frame. Say you have a sprite
+		that does a little shake and you want to emphasize it by having the sprite do a 
+		fast update inbetween frames 2 and 5, with the old script you can't do that. But
+		with this you can by doing something like this:
+		
+		Label: {
+		Loop:
+			b_set_frame(1)
+			b_pause(30)
+			b_set_frame(2)
+			b_pause(2)
+			b_set_frame(3)
+			b_pause(3)
+			b_set_frame(4)
+			b_pause(2)
+			b_set_frame(5)
+			b_pause(5)
+			b_set_frame(6)
+			b_pause(20)
+			b_set_frame(7)
+			b_pause(25)
+			b_set_frame(8)
+			b_pause(15)
+			
+			b_jmp(Loop)
+		}
+		
+	3. Given the previous example, you can display any frame of your sprite like so:
+		
+		Label: {												Label: {
+		Loop:													Loop:
+			b_set_frame(1)											// frame 1 is always displayed 1st
+			b_pause(20)												b_pause(20)
+			b_set_frame(2)		You can do it like this too			b_next_frame	// Display frame 2
+			b_pause(10)					------->					b_pause(10)
+			b_set_frame(3)											b_next_frame	// Display frame 3
+			b_pause(5)												b_pause(5)
+			b_set_frame(2)											b_prev_frame	// Display frame 2
+			b_pause(10)												b_pause(10)
+																	b_prev_frame	// Display frame 1
+			b_jmp(Loop)												b_jmp(Loop)
+		}														}
+		
+		You can go forwards or backwards or anywhere in between. If you intend to use
+		"b_next_frame" and "b_prev_frame", you'll have to keep track of what frame your
+		enemy is at, but it is more flexable than setting a specific frame. 
+		
+	4.	If you want your enemy to fly, you set a enemy's settings to make them fly like so:
+		
+		Label: {
+			b_set_flying_speed(1)
+			b_set_flying_height(10)
+			b_toggle_flying(1)
+			
+		Loop:
+			...
+		}
+		
+		You'll always want set the enemy's flying settings at the start of the script first,
+		then do the enemy's animations within the "Loop" label. 
+		
+		If you have used my previous "Animate_Enemy_Main" script, in order for an enemy to
+		fly, you have to set an enemy's stat to some value. It works, however it wasn't as
+		customizable per enemy usage as every enemy had the same height and speed value.
+		You also weren't able to disable the flying if, say, an enemy was paralyzed or
+		was feeling strange. This script should let you do that if you write your script
+		to do that functionality, by default it doesn't so you'll have to make it up yourself.
+		
+		The value passed to "b_set_flying_speed" denotes when to update the y-position at each
+		set frame. If you passed 1 to this command, it'll update the y-position at each frame.
+		If you passed 2 to this command, it'll update the y-position at every 2 frames.
+		
+		The value passed to "b_set_flying_height" denotes how high your enemy can float. 
+		The higher the number, the lower the height your enemy will float and slightly slows
+		down the speed of which your enemy goes up and down. It's a weird inverse thing beucase
+		this value actually is being used to divide the result of the sine function to limit
+		how high or low the sprite should be, relative to the base y-position of the sprite.
+		(NOTE TO DEV: IT BUGS WHEN YOU DISABLE FLYING WHEN YOU ENABLE IT IN THE FIRST PLACE
+		SINCE THE Y-POSITION DOESN'T SNAP BACK TO THE BASE Y-POSITION WHEN DISABLED)
+		
+	5. If you want your enemies to cycle colors within their palette, you can do this:
+	
+		Label: {
+			b_set_palette_cycle_rate(30)
+			b_toggle_palette_cycle(1)
+			
+		Loop:
+			...
+		}
+		
+		This will make the palette cycle colors shifting every color to the left and
+		wrapped around every 30 frames, one color at a time. You can control how fast
+		or slow you want it to be by passing in a value to the "b_set_palette_cycle_rate"
+		command.
+		
+		If, however, you want to keep some colors static and not cycle, you can use the
+		"b_set_half_palette_cycle(1)" command at the beginning. This will only cycle colors
+		from the first half of the palette, exclusing the transparency color (1st color).
+		This is useful if you want to keep a core compontent of the sprite intact while
+		having the rest of the colors be used for pulsating/shining/glowing or other uses
+		just like how the battle backgrounds paltte cycle.
+		
+	6.	There's also another command that lets you palette cycle as well:
+		
+		Label: {
+			b_set_result(0)
+			
+		Loop:
+			b_add_result(1)
+			b_jne_result(Loop_Back, 30)
+			
+			b_cycle_palette_left	// <--- this one here
+			b_set_result(0)
+			
+		Loop_Back:
+			b_pause(1)
+			b_jmp(Loop)
+		}
+		
+		This piece of script code functions behaviorly the same as the above script, but 
+		this example here manually cycles the palette using a register value to keep track of 
+		the frames and the "b_cycle_palette_left" command to cycle colors to the left once.
+		There's also the "b_cycle_palette_right" command as well to cycle the palettes in the
+		opposite direction. 
+						
+	As of right now, that's all of the major examples you'll need to start doing some cool stuff
+	with your enemy scripts. You can scroll down to the COMMANDS section to see all of the avaiable
+	commands you can use in your scripts. I'll make more examples as times goes on or when new
+	features are implemented so you can get a look on how they are used. But for now, have fun
+	with this and do some neat an cool things with your enemies.
+	
+	I'll also try to give each command their own descriptions soon, but for now I just wanna
+	put this script out there before Jank Jam 2 starts so that people can explore and experiment
+	with this first.
+*/
+
+//+=+=+=+=+= COMMANDS =+=+=+=+=+
+command b_halt {"[00]"}
+
+command b_pause(value) 			{"[01 FF {byte value}]"}
+command b_pause_result 			{"[01 00 00]"}
+command b_pause_var0 			{"[01 01 00]"}
+command b_pause_var1 			{"[01 02 00]"}
+command b_pause_var2 			{"[01 03 00]"}
+command b_pause_mem8(addr) 		{"[02 {short addr} 7E 00]"}
+command b_pause_mem8_long(addr) {"[02 {long addr}]"}
+command b_pause_mem8_var01		{"[03]"}
+
+command b_set_result(value) 			{"[04 00 {short value}]"}
+command b_set_result_mem8(addr) 		{"[05 00 00 {short addr} 7E 00]"}
+command b_set_result_mem8_long(addr) 	{"[05 00 00 {long addr}]"}
+command b_set_result_mem8_var01 		{"[06 00 00]"}
+command b_set_result_mem16(addr) 		{"[05 01 00 {short addr} 7E 00]"}
+command b_set_result_mem16_long(addr)	{"[05 01 00 {long addr}]"}
+command b_set_result_mem16_var01 		{"[06 01 00]"}
+
+command b_set_var0(value) 			{"[04 01 {short value}]"}
+command b_set_var0_mem8(addr) 		{"[05 00 01 {short addr} 7E 00]"}
+command b_set_var0_mem8_long(addr) 	{"[05 00 01 {long addr}]"}
+command b_set_var0_mem8_var01 		{"[06 00 01]"}
+command b_set_var0_mem16(addr) 		{"[05 01 01 {short addr} 7E 00]"}
+command b_set_var0_mem16_long(addr) {"[05 01 01 {long addr}]"}
+command b_set_var0_mem16_var01 		{"[06 01 01]"}
+
+command b_set_var1(value) 			{"[04 02 {short value}]"}
+command b_set_var1_mem8(addr) 		{"[05 00 02 {short addr} 7E 00]"}
+command b_set_var1_mem8_long(addr)	{"[05 00 02 {long addr}]"}
+command b_set_var1_mem8_var01 		{"[06 00 02]"}
+command b_set_var1_mem16(addr) 		{"[05 01 02 {short addr} 7E 00]"}
+command b_set_var1_mem16_long(addr) {"[05 01 02 {long addr}]"}
+command b_set_var1_mem16_var01 		{"[06 01 02]"}
+
+command b_set_var2(value) 			{"[04 03 {short value}]"}
+command b_set_var2_mem8(addr) 		{"[05 00 03 {short addr} 7E 00]"}
+command b_set_var2_mem8_long(addr) 	{"[05 00 03 {long addr}]"}
+command b_set_var2_mem8_var01 		{"[06 00 03]"}
+command b_set_var2_mem16(addr) 		{"[05 01 03 {short addr} 7E 00]"}
+command b_set_var2_mem16_long(addr) {"[05 01 03 {long addr}]"}
+command b_set_var2_mem16_var01 		{"[06 01 03]"}
+
+command b_copy_rtovar0 		{"[07 00 01]"}
+command b_copy_rtovar1 		{"[07 00 02]"}
+command b_copy_rtovar2 		{"[07 00 03]"}
+command b_copy_var0tor 		{"[07 01 00]"}
+command b_copy_var0tovar1 	{"[07 01 02]"}
+command b_copy_var0tovar2 	{"[07 01 03]"}
+command b_copy_var1tor 		{"[07 02 00]"}
+command b_copy_var1tovar0 	{"[07 02 01]"}
+command b_copy_var1tovar2 	{"[07 02 03]"}
+command b_copy_var2tor 		{"[07 03 00]"}
+command b_copy_var2tovar0 	{"[07 03 01]"}
+command b_copy_var2tovar1 	{"[07 03 02]"}
+
+command b_swap_randvar0 	{"[08 00 01]"}
+command b_swap_randvar1 	{"[08 00 02]"}
+command b_swap_randvar2 	{"[08 00 03]"}
+command b_swap_var0andr 	{"[08 01 00]"}
+command b_swap_var0andvar1 	{"[08 01 02]"}
+command b_swap_var0andvar2 	{"[08 01 03]"}
+command b_swap_var1andr 	{"[08 02 00]"}
+command b_swap_var1andvar0 	{"[08 02 01]"}
+command b_swap_var1andvar2 	{"[08 02 03]"}
+command b_swap_var2andr 	{"[08 03 00]"}
+command b_swap_var2andvar0 	{"[08 03 01]"}
+command b_swap_var2andvar1 	{"[08 03 02]"}
+
+command b_set_mem8(addr, value) 	{"[09 00 FF {short addr} 7E 00 {byte value} 00]"}
+command b_set_mem8_long(addr, value){"[09 00 FF {long addr} {byte value} 00]"}
+command b_set_mem8_result(addr) 	{"[09 00 00 {short addr} 7E 00 00 00]"}
+command b_set_mem8_long_result(addr){"[09 00 00 {long addr} 00 00]"}
+command b_set_mem8_var0(addr) 		{"[09 00 01 {short addr} 7E 00 00 00]"}
+command b_set_mem8_long_var0(addr)	{"[09 00 01 {long addr} 00 00]"}
+command b_set_mem8_var1(addr) 		{"[09 00 02 {short addr} 7E 00 00 00]"}
+command b_set_mem8_long_var1(addr)	{"[09 00 02 {long addr} 00 00]"}
+command b_set_mem8_var2(addr) 		{"[09 00 03 {short addr} 7E 00 00 00]"}
+command b_set_mem8_long_var2(addr)	{"[09 00 03 {long addr} 00 00]"}
+
+command b_set_mem8_var01(value) 	{"[0A 00 FF {byte value} 00]"}
+command b_set_mem8_var01_result 	{"[0A 00 00 00 00]"}
+command b_set_mem8_var01_var0 		{"[0A 00 01 00 00]"}
+command b_set_mem8_var01_var1 		{"[0A 00 02 00 00]"}
+command b_set_mem8_var01_var2 		{"[0A 00 03 00 00]"}
+
+command b_set_mem16(addr, value) 		{"[09 01 FF {short addr} 7E 00 {short value}]"}
+command b_set_mem16_long(addr, value)	{"[09 01 FF {long addr} {short value}]"}
+command b_set_mem16_result(addr) 		{"[09 01 00 {short addr} 7E 00 00 00]"}
+command b_set_mem16_long_result(addr)	{"[09 01 00 {long addr} 00 00]"}
+command b_set_mem16_var0(addr) 			{"[09 01 01 {short addr} 7E 00 00 00]"}
+command b_set_mem16_long_var0(addr)		{"[09 01 01 {long addr} 00 00]"}
+command b_set_mem16_var1(addr) 			{"[09 01 02 {short addr} 7E 00 00 00]"}
+command b_set_mem16_long_var1(addr)		{"[09 01 02 {long addr} 00 00]"}
+command b_set_mem16_var2(addr) 			{"[09 01 03 {short addr} 7E 00 00 00]"}
+command b_set_mem16_long_var2(addr)		{"[09 01 03 {long addr} 00 00]"}
+
+command b_set_mem16_var01(value) 		{"[0A 01 FF {short value}]"}
+command b_set_mem16_var01_result 		{"[0A 01 00 00 00]"}
+command b_set_mem16_var01_var0 			{"[0A 01 01 00 00]"}
+command b_set_mem16_var01_var1 			{"[0A 01 02 00 00]"}
+command b_set_mem16_var01_var2 			{"[0A 01 03 00 00]"}
+
+command b_add_result(value)	{"[0B 00 {short value}]"}
+command b_add_var0(value) 	{"[0B 01 {short value}]"}
+command b_add_var1(value) 	{"[0B 02 {short value}]"}
+command b_add_var2(value) 	{"[0B 03 {short value}]"}
+
+command b_add_result_result {"[0C 00 00]"}
+command b_add_result_var0 	{"[0C 00 01]"}
+command b_add_result_var1 	{"[0C 00 02]"}
+command b_add_result_var2	{"[0C 00 03]"}
+command b_add_var0_result 	{"[0C 01 00]"}
+command b_add_var0_var0 	{"[0C 01 01]"}
+command b_add_var0_var1 	{"[0C 01 02]"}
+command b_add_var0_var2 	{"[0C 01 03]"}
+command b_add_var1_result 	{"[0C 02 00]"}
+command b_add_var1_var0 	{"[0C 02 01]"}
+command b_add_var1_var1 	{"[0C 02 02]"}
+command b_add_var1_var2 	{"[0C 02 03]"}
+command b_add_var2_result 	{"[0C 03 00]"}
+command b_add_var2_var0 	{"[0C 03 01]"}
+command b_add_var2_var1 	{"[0C 03 02]"}
+command b_add_var2_var2 	{"[0C 03 03]"}
+
+command b_add_result_mem8(addr) 		{"[0D 00 00 {short addr} 7E 00]"}
+command b_add_var0_mem8(addr) 			{"[0D 00 01 {short addr} 7E 00]"}
+command b_add_var1_mem8(addr) 			{"[0D 00 02 {short addr} 7E 00]"}
+command b_add_var2_mem8(addr) 			{"[0D 00 03 {short addr} 7E 00]"}
+command b_add_result_mem8_long(addr)	{"[0D 00 00 {long addr}]"}
+command b_add_var0_mem8_long(addr)	 	{"[0D 00 01 {long addr}]"}
+command b_add_var1_mem8_long(addr) 		{"[0D 00 02 {long addr}]"}
+command b_add_var2_mem8_long(addr) 		{"[0D 00 03 {long addr}]"}
+command b_add_result_mem8_var01			{"[0E 00 00]"}
+command b_add_var0_mem8_var01			{"[0E 00 01]"}
+command b_add_var1_mem8_var01			{"[0E 00 02]"}
+command b_add_var2_mem8_var01			{"[0E 00 03]"}
+
+command b_add_mem8(addr, value) 		{"[0F 00 {short addr} 7E 00 {byte value} 00]"}
+command b_add_mem8_long(addr, value)	{"[0F 00 {load addr} {byte value} 00]"}
+command b_add_mem8_result(addr)			{"[10 00 00 {short addr} 7E 00]"}
+command b_add_mem8_var0(addr) 			{"[10 00 01 {short addr} 7E 00]"}
+command b_add_mem8_var1(addr)			{"[10 00 02 {short addr} 7E 00]"}
+command b_add_mem8_var2(addr) 			{"[10 00 03 {short addr} 7E 00]"}
+command b_add_mem8_long_result(addr)	{"[10 00 00 {long addr}]"}
+command b_add_mem8_long_var0(addr) 		{"[10 00 01 {long addr}]"}
+command b_add_mem8_long_var1(addr) 		{"[10 00 02 {long addr}]"}
+command b_add_mem8_long_var2(addr) 		{"[10 00 03 {long addr}]"}
+command b_add_mem8_var01(value) 		{"[11 00 FF {byte value} 00]"}
+command b_add_mem8_var01_result 		{"[11 00 00 00 00]"}
+command b_add_mem8_var01_var0 			{"[11 00 01 00 00]"}
+command b_add_mem8_var01_var1 			{"[11 00 02 00 00]"}
+command b_add_mem8_var01_var2 			{"[11 00 03 00 00]"}
+
+command b_add_result_mem16(addr) 		{"[0D 01 00 {short addr} 7E 00]"}
+command b_add_var0_mem16(addr) 			{"[0D 01 01 {short addr} 7E 00]"}
+command b_add_var1_mem16(addr) 			{"[0D 01 02 {short addr} 7E 00]"}
+command b_add_var2_mem16(addr) 			{"[0D 01 03 {short addr} 7E 00]"}
+command b_add_result_mem16_long(addr)	{"[0D 01 00 {long addr}]"}
+command b_add_var0_mem16_long(addr) 	{"[0D 01 01 {long addr}]"}
+command b_add_var1_mem16_long(addr) 	{"[0D 01 02 {long addr}]"}
+command b_add_var2_mem16_long(addr) 	{"[0D 01 03 {long addr}]"}
+command b_add_result_mem16_var01		{"[0E 01 00]"}
+command b_add_var0_mem16_var01			{"[0E 01 01]"}
+command b_add_var1_mem16_var01			{"[0E 01 02]"}
+command b_add_var2_mem16_var01			{"[0E 01 03]"}
+
+command b_add_mem16(addr, value) 		{"[0F 01 {short addr} 7E 00 {short value}]"}
+command b_add_mem16_long(addr, value)	{"[0F 01 {long addr} {short value}]"}
+command b_add_mem16_result(addr)		{"[10 01 00 {short addr} 7E 00]"}
+command b_add_mem16_var0(addr) 			{"[10 01 01 {short addr} 7E 00]"}
+command b_add_mem16_var1(addr)			{"[10 01 02 {short addr} 7E 00]"}
+command b_add_mem16_var2(addr) 			{"[10 01 03 {short addr} 7E 00]"}
+command b_add_mem16_long_result(addr)	{"[10 01 00 {long addr}]"}
+command b_add_mem16_long_var0(addr) 	{"[10 01 01 {long addr}]"}
+command b_add_mem16_long_var1(addr) 	{"[10 01 02 {long addr}]"}
+command b_add_mem16_long_var2(addr) 	{"[10 01 03 {long addr}]"}
+command b_add_mem16_var01(value) 		{"[11 01 FF {short value}]"}
+command b_add_mem16_var01_result 		{"[11 01 00 00 00]"}
+command b_add_mem16_var01_var0 			{"[11 01 01 00 00]"}
+command b_add_mem16_var01_var1 			{"[11 01 02 00 00]"}
+command b_add_mem16_var01_var2 			{"[11 01 03 00 00]"}
+
+command b_and_result(value)	{"[12 00 {short value}]"}
+command b_and_var0(value) 	{"[12 01 {short value}]"}
+command b_and_var1(value) 	{"[12 02 {short value}]"}
+command b_and_var2(value) 	{"[12 03 {short value}]"}
+
+command b_and_result_result {"[13 00 00]"}
+command b_and_result_var0 	{"[13 00 01]"}
+command b_and_result_var1 	{"[13 00 02]"}
+command b_and_result_var2	{"[13 00 03]"}
+command b_and_var0_result 	{"[13 01 00]"}
+command b_and_var0_var0 	{"[13 01 01]"}
+command b_and_var0_var1 	{"[13 01 02]"}
+command b_and_var0_var2 	{"[13 01 03]"}
+command b_and_var1_result 	{"[13 02 00]"}
+command b_and_var1_var0 	{"[13 02 01]"}
+command b_and_var1_var1 	{"[13 02 02]"}
+command b_and_var1_var2 	{"[13 02 03]"}
+command b_and_var2_result 	{"[13 03 00]"}
+command b_and_var2_var0 	{"[13 03 01]"}
+command b_and_var2_var1 	{"[13 03 02]"}
+command b_and_var2_var2 	{"[13 03 03]"}
+
+command b_and_result_mem8(addr) 		{"[14 00 00 {short addr} 7E 00]"}
+command b_and_var0_mem8(addr) 			{"[14 00 01 {short addr} 7E 00]"}
+command b_and_var1_mem8(addr) 			{"[14 00 02 {short addr} 7E 00]"}
+command b_and_var2_mem8(addr) 			{"[14 00 03 {short addr} 7E 00]"}
+command b_and_result_mem8_long(addr)	{"[14 00 00 {long addr}]"}
+command b_and_var0_mem8_long(addr)	 	{"[14 00 01 {long addr}]"}
+command b_and_var1_mem8_long(addr) 		{"[14 00 02 {long addr}]"}
+command b_and_var2_mem8_long(addr) 		{"[14 00 03 {long addr}]"}
+command b_and_result_mem8_var01			{"[15 00 00]"}
+command b_and_var0_mem8_var01			{"[15 00 01]"}
+command b_and_var1_mem8_var01			{"[15 00 02]"}
+command b_and_var2_mem8_var01			{"[15 00 03]"}
+
+command b_and_mem8(addr, value) 		{"[16 00 {short addr} 7E 00 {byte value} 00]"}
+command b_and_mem8_long(addr, value)	{"[16 00 {long addr} {byte value} 00]"}
+command b_and_mem8_result(addr)			{"[17 00 00 {short addr} 7E 00]"}
+command b_and_mem8_var0(addr) 			{"[17 00 01 {short addr} 7E 00]"}
+command b_and_mem8_var1(addr)			{"[17 00 02 {short addr} 7E 00]"}
+command b_and_mem8_var2(addr) 			{"[17 00 03 {short addr} 7E 00]"}
+command b_and_mem8_long_result(addr)	{"[17 00 00 {long addr}]"}
+command b_and_mem8_long_var0(addr) 		{"[17 00 01 {long addr}]"}
+command b_and_mem8_long_var1(addr) 		{"[17 00 02 {long addr}]"}
+command b_and_mem8_long_var2(addr) 		{"[17 00 03 {long addr}]"}
+command b_and_mem8_var01(value) 		{"[18 00 FF {byte value} 00]"}
+command b_and_mem8_var01_result 		{"[18 00 00 00 00]"}
+command b_and_mem8_var01_var0 			{"[18 00 01 00 00]"}
+command b_and_mem8_var01_var1 			{"[18 00 02 00 00]"}
+command b_and_mem8_var01_var2 			{"[18 00 03 00 00]"}
+
+command b_and_result_mem16(addr) 		{"[14 01 00 {short addr} 7E 00]"}
+command b_and_var0_mem16(addr) 			{"[14 01 01 {short addr} 7E 00]"}
+command b_and_var1_mem16(addr) 			{"[14 01 02 {short addr} 7E 00]"}
+command b_and_var2_mem16(addr) 			{"[14 01 03 {short addr} 7E 00]"}
+command b_and_result_mem16_long(addr)	{"[14 01 00 {long addr}]"}
+command b_and_var0_mem16_long(addr) 	{"[14 01 01 {long addr}]"}
+command b_and_var1_mem16_long(addr) 	{"[14 01 02 {long addr}]"}
+command b_and_var2_mem16_long(addr) 	{"[14 01 03 {long addr}]"}
+command b_and_result_mem16_var01		{"[15 01 00]"}
+command b_and_var0_mem16_var01			{"[15 01 01]"}
+command b_and_var1_mem16_var01			{"[15 01 02]"}
+command b_and_var2_mem16_var01			{"[15 01 03]"}
+
+command b_and_mem16(addr, value) 		{"[16 01 {short addr} 7E 00 {short value}]"}
+command b_and_mem16_long(addr, value)	{"[16 01 {long addr} {short value}]"}
+command b_and_mem16_result(addr)		{"[17 01 00 {short addr} 7E 00]"}
+command b_and_mem16_var0(addr) 			{"[17 01 01 {short addr} 7E 00]"}
+command b_and_mem16_var1(addr)			{"[17 01 02 {short addr} 7E 00]"}
+command b_and_mem16_var2(addr) 			{"[17 01 03 {short addr} 7E 00]"}
+command b_and_mem16_long_result(addr)	{"[17 01 00 {long addr}]"}
+command b_and_mem16_long_var0(addr) 	{"[17 01 01 {long addr}]"}
+command b_and_mem16_long_var1(addr) 	{"[17 01 02 {long addr}]"}
+command b_and_mem16_long_var2(addr) 	{"[17 01 03 {long addr}]"}
+command b_and_mem16_var01(value) 		{"[18 01 FF {short value}]"}
+command b_and_mem16_var01_result 		{"[18 01 00 00 00]"}
+command b_and_mem16_var01_var0 			{"[18 01 01 00 00]"}
+command b_and_mem16_var01_var1 			{"[18 01 02 00 00]"}
+command b_and_mem16_var01_var2 			{"[18 01 03 00 00]"}
+
+command b_or_result(value)	{"[19 00 {short value}]"}
+command b_or_var0(value) 	{"[19 01 {short value}]"}
+command b_or_var1(value) 	{"[19 02 {short value}]"}
+command b_or_var2(value) 	{"[19 03 {short value}]"}
+
+command b_or_result_result 	{"[1A 00 00]"}
+command b_or_result_var0 	{"[1A 00 01]"}
+command b_or_result_var1 	{"[1A 00 02]"}
+command b_or_result_var2	{"[1A 00 03]"}
+command b_or_var0_result 	{"[1A 01 00]"}
+command b_or_var0_var0 		{"[1A 01 01]"}
+command b_or_var0_var1 		{"[1A 01 02]"}
+command b_or_var0_var2 		{"[1A 01 03]"}
+command b_or_var1_result 	{"[1A 02 00]"}
+command b_or_var1_var0 		{"[1A 02 01]"}
+command b_or_var1_var1 		{"[1A 02 02]"}
+command b_or_var1_var2 		{"[1A 02 03]"}
+command b_or_var2_result 	{"[1A 03 00]"}
+command b_or_var2_var0 		{"[1A 03 01]"}
+command b_or_var2_var1 		{"[1A 03 02]"}
+command b_or_var2_var2 		{"[1A 03 03]"}
+
+command b_or_result_mem8(addr) 		{"[1B 00 00 {short addr} 7E 00]"}
+command b_or_var0_mem8(addr)		{"[1B 00 01 {short addr} 7E 00]"}
+command b_or_var1_mem8(addr) 		{"[1B 00 02 {short addr} 7E 00]"}
+command b_or_var2_mem8(addr) 		{"[1B 00 03 {short addr} 7E 00]"}
+command b_or_result_mem8_long(addr)	{"[1B 00 00 {long addr}]"}
+command b_or_var0_mem8_long(addr)	{"[1B 00 01 {long addr}]"}
+command b_or_var1_mem8_long(addr) 	{"[1B 00 02 {long addr}]"}
+command b_or_var2_mem8_long(addr) 	{"[1B 00 03 {long addr}]"}
+command b_or_result_mem8_var01		{"[1C 00 00]"}
+command b_or_var0_mem8_var01		{"[1C 00 01]"}
+command b_or_var1_mem8_var01		{"[1C 00 02]"}
+command b_or_var2_mem8_var01		{"[1C 00 03]"}
+
+command b_or_mem8(addr, value) 		{"[1D 00 {short addr} 7E 00 {byte value} 00]"}
+command b_or_mem8_long(addr, value)	{"[1D 00 {long addr} {byte value} 00]"}
+command b_or_mem8_result(addr)		{"[1E 00 00 {short addr} 7E 00]"}
+command b_or_mem8_var0(addr) 		{"[1E 00 01 {short addr} 7E 00]"}
+command b_or_mem8_var1(addr)		{"[1E 00 02 {short addr} 7E 00]"}
+command b_or_mem8_var2(addr) 		{"[1E 00 03 {short addr} 7E 00]"}
+command b_or_mem8_long_result(addr)	{"[1E 00 00 {long addr}]"}
+command b_or_mem8_long_var0(addr) 	{"[1E 00 01 {long addr}]"}
+command b_or_mem8_long_var1(addr) 	{"[1E 00 02 {long addr}]"}
+command b_or_mem8_long_var2(addr) 	{"[1E 00 03 {long addr}]"}
+command b_or_mem8_var01(value) 		{"[1F 00 FF {byte value} 00]"}
+command b_or_mem8_var01_result 		{"[1F 00 00 00 00]"}
+command b_or_mem8_var01_var0 		{"[1F 00 01 00 00]"}
+command b_or_mem8_var01_var1 		{"[1F 00 02 00 00]"}
+command b_or_mem8_var01_var2 		{"[1F 00 03 00 00]"}
+
+command b_or_result_mem16(addr) 	{"[1B 01 00 {short addr} 7E 00]"}
+command b_or_var0_mem16(addr) 		{"[1B 01 01 {short addr} 7E 00]"}
+command b_or_var1_mem16(addr) 		{"[1B 01 02 {short addr} 7E 00]"}
+command b_or_var2_mem16(addr) 		{"[1B 01 03 {short addr} 7E 00]"}
+command b_or_result_mem16_long(addr){"[1B 01 00 {long addr}]"}
+command b_or_var0_mem16_long(addr) 	{"[1B 01 01 {long addr}]"}
+command b_or_var1_mem16_long(addr) 	{"[1B 01 02 {long addr}]"}
+command b_or_var2_mem16_long(addr) 	{"[1B 01 03 {long addr}]"}
+command b_or_result_mem16_var01		{"[1C 01 00]"}
+command b_or_var0_mem16_var01		{"[1C 01 01]"}
+command b_or_var1_mem16_var01		{"[1C 01 02]"}
+command b_or_var2_mem16_var01		{"[1C 01 03]"}
+
+command b_or_mem16(addr, value) 	{"[1D 01 {short addr} 7E 00 {short value}]"}
+command b_or_mem16_long(addr, value){"[1D 01 {long addr} {short value}]"}
+command b_or_mem16_result(addr)		{"[1E 01 00 {short addr} 7E 00]"}
+command b_or_mem16_var0(addr) 		{"[1E 01 01 {short addr} 7E 00]"}
+command b_or_mem16_var1(addr)		{"[1E 01 02 {short addr} 7E 00]"}
+command b_or_mem16_var2(addr) 		{"[1E 01 03 {short addr} 7E 00]"}
+command b_or_mem16_long_result(addr){"[1E 01 00 {long addr}]"}
+command b_or_mem16_long_var0(addr) 	{"[1E 01 01 {long addr}]"}
+command b_or_mem16_long_var1(addr) 	{"[1E 01 02 {long addr}]"}
+command b_or_mem16_long_var2(addr) 	{"[1E 01 03 {long addr}]"}
+command b_or_mem16_var01(value) 	{"[1F 01 FF {short value}]"}
+command b_or_mem16_var01_result 	{"[1F 01 00 00 00]"}
+command b_or_mem16_var01_var0 		{"[1F 01 01 00 00]"}
+command b_or_mem16_var01_var1 		{"[1F 01 02 00 00]"}
+command b_or_mem16_var01_var2 		{"[1F 01 03 00 00]"}
+
+command b_xor_result(value)	{"[20 00 {short value}]"}
+command b_xor_var0(value) 	{"[20 01 {short value}]"}
+command b_xor_var1(value) 	{"[20 02 {short value}]"}
+command b_xor_var2(value) 	{"[20 03 {short value}]"}
+
+command b_xor_result_result {"[21 00 00]"}
+command b_xor_result_var0 	{"[21 00 01]"}
+command b_xor_result_var1 	{"[21 00 02]"}
+command b_xor_result_var2	{"[21 00 03]"}
+command b_xor_var0_result 	{"[21 01 00]"}
+command b_xor_var0_var0 	{"[21 01 01]"}
+command b_xor_var0_var1 	{"[21 01 02]"}
+command b_xor_var0_var2 	{"[21 01 03]"}
+command b_xor_var1_result 	{"[21 02 00]"}
+command b_xor_var1_var0 	{"[21 02 01]"}
+command b_xor_var1_var1 	{"[21 02 02]"}
+command b_xor_var1_var2 	{"[21 02 03]"}
+command b_xor_var2_result 	{"[21 03 00]"}
+command b_xor_var2_var0 	{"[21 03 01]"}
+command b_xor_var2_var1 	{"[21 03 02]"}
+command b_xor_var2_var2 	{"[21 03 03]"}
+
+command b_xor_result_mem8(addr) 	{"[22 00 00 {short addr} 7E 00]"}
+command b_xor_var0_mem8(addr)		{"[22 00 01 {short addr} 7E 00]"}
+command b_xor_var1_mem8(addr) 		{"[22 00 02 {short addr} 7E 00]"}
+command b_xor_var2_mem8(addr) 		{"[22 00 03 {short addr} 7E 00]"}
+command b_xor_result_mem8_long(addr){"[22 00 00 {long addr}]"}
+command b_xor_var0_mem8_long(addr)	{"[22 00 01 {long addr}]"}
+command b_xor_var1_mem8_long(addr) 	{"[22 00 02 {long addr}]"}
+command b_xor_var2_mem8_long(addr) 	{"[22 00 03 {long addr}]"}
+command b_xor_result_mem8_var01		{"[23 00 00]"}
+command b_xor_var0_mem8_var01		{"[23 00 01]"}
+command b_xor_var1_mem8_var01		{"[23 00 02]"}
+command b_xor_var2_mem8_var01		{"[23 00 03]"}
+
+command b_xor_mem8(addr, value) 	{"[24 00 {short addr} 7E 00 {short value}]"}
+command b_xor_mem8_long(addr, value){"[24 00 {long addr} {short value}]"}
+command b_xor_mem8_result(addr)		{"[25 00 00 {short addr} 7E 00]"}
+command b_xor_mem8_var0(addr) 		{"[25 00 01 {short addr} 7E 00]"}
+command b_xor_mem8_var1(addr)		{"[25 00 02 {short addr} 7E 00]"}
+command b_xor_mem8_var2(addr) 		{"[25 00 03 {short addr} 7E 00]"}
+command b_xor_mem8_long_result(addr){"[25 00 00 {long addr}]"}
+command b_xor_mem8_long_var0(addr) 	{"[25 00 01 {long addr}"}
+command b_xor_mem8_long_var1(addr) 	{"[25 00 02 {long addr}]"}
+command b_xor_mem8_long_var2(addr) 	{"[25 00 03 {long addr}]"}
+command b_xor_mem8_var01(value) 	{"[26 00 FF {short value}]"}
+command b_xor_mem8_var01_result 	{"[26 00 00 00 00]"}
+command b_xor_mem8_var01_var0 		{"[26 00 01 00 00]"}
+command b_xor_mem8_var01_var1 		{"[26 00 02 00 00]"}
+command b_xor_mem8_var01_var2 		{"[26 00 03 00 00]"}
+
+command b_xor_result_mem16(addr) 		{"[22 01 00 {short addr} 7E 00]"}
+command b_xor_var0_mem16(addr) 			{"[22 01 01 {short addr} 7E 00]"}
+command b_xor_var1_mem16(addr) 			{"[22 01 02 {short addr} 7E 00]"}
+command b_xor_var2_mem16(addr) 			{"[22 01 03 {short addr} 7E 00]"}
+command b_xor_result_mem16_long(addr)	{"[22 01 00 {long addr}]"}
+command b_xor_var0_mem16_long(addr) 	{"[22 01 01 {long addr}]"}
+command b_xor_var1_mem16_long(addr) 	{"[22 01 02 {long addr}]"}
+command b_xor_var2_mem16_long(addr) 	{"[22 01 03 {long addr}]"}
+command b_xor_result_mem16_var01		{"[23 01 00]"}
+command b_xor_var0_mem16_var01			{"[23 01 01]"}
+command b_xor_var1_mem16_var01			{"[23 01 02]"}
+command b_xor_var2_mem16_var01			{"[23 01 03]"}
+
+command b_xor_mem16(addr, value) 		{"[24 01 {short addr} 7E 00 {short value}]"}
+command b_xor_mem16_long(addr, value)	{"[24 01 {long addr} {short value}]"}
+command b_xor_mem16_result(addr)		{"[25 01 00 {short addr} 7E 00]"}
+command b_xor_mem16_var0(addr) 			{"[25 01 01 {short addr} 7E 00]"}
+command b_xor_mem16_var1(addr)			{"[25 01 02 {short addr} 7E 00]"}
+command b_xor_mem16_var2(addr) 			{"[25 01 03 {short addr} 7E 00]"}
+command b_xor_mem16_long_result(addr)	{"[25 01 00 {long addr}]"}
+command b_xor_mem16_long_var0(addr) 	{"[25 01 01 {long addr}]"}
+command b_xor_mem16_long_var1(addr) 	{"[25 01 02 {long addr}]"}
+command b_xor_mem16_long_var2(addr) 	{"[25 01 03 {long addr}]"}
+command b_xor_mem16_var01(value) 		{"[26 01 FF {short value}]"}
+command b_xor_mem16_var01_result 		{"[26 01 00 00 00]"}
+command b_xor_mem16_var01_var0 			{"[26 01 01 00 00]"}
+command b_xor_mem16_var01_var1 			{"[26 01 02 00 00]"}
+command b_xor_mem16_var01_var2 			{"[26 01 03 00 00]"}
+
+command b_jmp(addr)			{"[27 {short addr}]"}
+command b_jml(addr) 		{"[28 {long addr}]"}
+command b_multijmp(amount)	{"[29 {short amount}]"}
+command b_multijml(amount)	{"[2A {short amount}]"}
+
+command b_jeq_result(addr, value)	{"[2B 00 {short addr} {short value}]"}
+command b_jeq_var0(addr, value)		{"[2B 01 {short addr} {short value}]"}
+command b_jeq_var1(addr, value)		{"[2B 02 {short addr} {short value}]"}
+command b_jeq_var2(addr, value)		{"[2B 03 {short addr} {short value}]"}
+
+command b_jne_result(addr, value)	{"[2C 00 {short addr} {short value}]"}
+command b_jne_var0(addr, value)		{"[2C 01 {short addr} {short value}]"}
+command b_jne_var1(addr, value)		{"[2C 02 {short addr} {short value}]"}
+command b_jne_var2(addr, value)		{"[2C 03 {short addr} {short value}]"}
+
+command b_jge_result(addr, value)	{"[2D 00 {short addr} {short value}]"}
+command b_jge_var0(addr, value)		{"[2D 01 {short addr} {short value}]"}
+command b_jge_var1(addr, value)		{"[2D 02 {short addr} {short value}]"}
+command b_jge_var2(addr, value)		{"[2D 03 {short addr} {short value}]"}
+
+command b_jgt_result(addr, value)	{"[2E 00 {short addr} {short value}]"}
+command b_jgt_var0(addr, value)		{"[2E 01 {short addr} {short value}]"}
+command b_jgt_var1(addr, value)		{"[2E 02 {short addr} {short value}]"}
+command b_jgt_var2(addr, value)		{"[2E 03 {short addr} {short value}]"}
+
+command b_jlt_result(addr, value)	{"[2F 00 {short addr} {short value}]"}
+command b_jlt_var0(addr, value)		{"[2F 01 {short addr} {short value}]"}
+command b_jlt_var1(addr, value)		{"[2F 02 {short addr} {short value}]"}
+command b_jlt_var2(addr, value)		{"[2F 03 {short addr} {short value}]"}
+
+command b_get_frame_result	{"[30 00]"}
+command b_get_frame_var0	{"[30 01]"}
+command b_get_frame_var1	{"[30 02]"}
+command b_get_frame_var2	{"[30 03]"}
+
+command b_set_frame(value)			{"[31 FF {byte value}]"}
+command b_set_frame_result			{"[31 00 00]"}
+command b_set_frame_var0			{"[31 01 00]"}
+command b_set_frame_var1			{"[31 02 00]"}
+command b_set_frame_var2			{"[31 03 00]"}
+command b_set_frame_mem8(addr)		{"[32 {short addr} 7E 00]"}
+command b_set_frame_mem8_long(addr)	{"[32 {long addr}]"}
+command b_set_frame_mem8_var01		{"[33]"}
+command b_set_frame_random 			{"[34]"}
+
+command b_next_frame	{"[35]"}
+command b_prev_frame	{"[36]"}
+
+command b_get_priority_result	{"[37 00]"}
+command b_get_priority_var0		{"[37 00]"}
+command b_get_priority_var1		{"[37 00]"}
+command b_get_priority_var2		{"[37 00]"}
+
+command b_set_priority(value)			{"[38 FF {byte value}]"}
+command b_set_priority_result			{"[38 00 00]"}
+command b_set_priority_var0				{"[38 01 00]"}
+command b_set_priority_var1				{"[38 02 00]"}
+command b_set_priority_var2				{"[38 03 00]"}
+command b_set_priority_mem8(addr)		{"[39 {short addr} 7E 00]"}
+command b_set_priority_mem8_long(addr)	{"[39 {long addr}]"}
+command b_set_priority_mem8_var01		{"[3A]"}
+
+command b_get_base_xpos_result		{"[3B 00]"}
+command b_get_base_xpos_var0		{"[3B 01]"}
+command b_get_base_xpos_var1		{"[3B 02]"}
+command b_get_base_xpos_var2		{"[3B 03]"}
+
+command b_get_current_xpos_result	{"[3C 00]"}
+command b_get_current_xpos_var0		{"[3C 01]"}
+command b_get_current_xpos_var1		{"[3C 02]"}
+command b_get_current_xpos_var2		{"[3C 03]"}
+
+command b_set_xpos(value)			{"[3D FF {byte value}]"}
+command b_set_xpos_result			{"[3D 00 00]"}
+command b_set_xpos_var0				{"[3D 01 00]"}
+command b_set_xpos_var1				{"[3D 02 00]"}
+command b_set_xpos_var2				{"[3D 03 00]"}
+command b_set_xpos_mem8(addr) 		{"[3E {short addr} 7E 00]"}
+command b_set_xpos_mem8_long(addr) 	{"[3E {long addr}]"}
+command b_set_xpos_mem8_var01		{"[3F]"}
+
+command b_get_base_ypos_result		{"[40 00]"}
+command b_get_base_ypos_var0		{"[40 01]"}
+command b_get_base_ypos_var1		{"[40 02]"}
+command b_get_base_ypos_var2		{"[40 03]"}
+
+command b_get_current_ypos_result	{"[41 00]"}
+command b_get_current_ypos_var0		{"[41 01]"}
+command b_get_current_ypos_var1		{"[41 02]"}
+command b_get_current_ypos_var2		{"[41 03]"}
+
+command b_set_ypos(value)			{"[42 FF {byte value}]"}
+command b_set_ypos_result			{"[42 00 00]"}
+command b_set_ypos_var0				{"[42 01 00]"}
+command b_set_ypos_var1				{"[42 02 00]"}
+command b_set_ypos_var2				{"[42 03 00]"}
+command b_set_ypos_mem8(addr) 		{"[43 {short addr} 7E 00]"}
+command b_set_ypos_mem8_long(addr) 	{"[43 {long addr}]"}
+command b_set_ypos_mem8_var01		{"[44]"}
+
+command b_get_palette_result		{"[45 00]"}
+command b_get_palette_var0			{"[45 01]"}
+command b_get_palette_var1			{"[45 02]"}
+command b_get_palette_var2			{"[45 03]"}
+
+command b_set_palette(value)			{"[46 FF {byte value}]"}
+command b_set_palette_result			{"[46 00 00]"}
+command b_set_palette_var0				{"[46 01 00]"}
+command b_set_palette_var1				{"[46 02 00]"}
+command b_set_palette_var2				{"[46 03 00]"}
+command b_set_palette_mem8(addr)		{"[47 {short addr} 7E 00]"}
+command b_set_palette_mem8_long(addr)	{"[47 {long addr}]"}
+command b_set_palette_mem8_var01		{"[48]"}
+
+command b_new_palette(addr)		{"[49 {long addr}]"}
+command b_new_palette_var01		{"[4A]"}
+
+command b_toggle_palette_cycle(value)			{"[4B {byte value}]"}
+
+command b_set_palette_cycle_rate(value)			{"[4C FF {byte value}]"}
+command b_set_palette_cycle_rate_result 		{"[4C 00 00]"}
+command b_set_palette_cycle_rate_var0 			{"[4C 01 00]"}
+command b_set_palette_cycle_rate_var1 			{"[4C 02 00]"}
+command b_set_palette_cycle_rate_var2 			{"[4C 03 00]"}
+command b_set_palette_cycle_rate_mem8(addr) 	{"[4D {short addr} 7E 00]"}
+command b_set_palette_cycle_rate_mem8_long(addr){"[4D {long addr}"}
+command b_set_palette_cycle_rate_mem8_var01 	{"[4E]"}
+
+command b_get_horizontal_result		{"[4F 00]"}
+command b_get_horizontal_var0		{"[4F 01]"}
+command b_get_horizontal_var1		{"[4F 02]"}
+command b_get_horizontal_var2		{"[4F 03]"}
+
+command b_set_horizontal(value)			{"[50 FF {byte value}]"}
+command b_set_horizontal_result			{"[50 00 00]"}
+command b_set_horizontal_var0			{"[50 01 00]"}
+command b_set_horizontal_var1			{"[50 02 00]"}
+command b_set_horizontal_var2			{"[50 03 00]"}
+command b_set_horizontal_mem8(addr)		{"[51 {short addr} 7E 00]"}
+command b_set_horizontal_mem8_long(addr){"[51 {long addr}]"}
+command b_set_horizontal_mem8_var01		{"[52]"}
+
+command b_get_vertical_result		{"[53 00]"}
+command b_get_vertical_var0			{"[53 01]"}
+command b_get_vertical_var1			{"[53 02]"}
+command b_get_vertical_var2			{"[53 03]"}
+
+command b_set_vertical(value)			{"[54 FF {byte value}]"}
+command b_set_vertical_result			{"[54 00 00]"}
+command b_set_vertical_var0				{"[54 01 00]"}
+command b_set_vertical_var1				{"[54 02 00]"}
+command b_set_vertical_var2				{"[54 03 00]"}
+command b_set_vertical_mem8(addr)		{"[55 {short addr} 7E 00]"}
+command b_set_vertical_mem8_long(addr) 	{"[55 {long addr}]"}
+command b_set_vertical_mem8_var01		{"[56]"}
+
+command b_get_enemy_stat_result(offset)	{"[57 00 {byte offset}]"}
+command b_get_enemy_stat_var0(offset)	{"[57 01 {byte offset}]"}
+command b_get_enemy_stat_var1(offset)	{"[57 02 {byte offset}]"}
+command b_get_enemy_stat_var2(offset)	{"[57 03 {byte offset}]"}
+
+command b_set_enemy_stat(offset, value)	{"[58 FF {byte offset} {short value}]"}
+command b_set_enemy_stat_result(offset)	{"[58 00 {byte offset} 00 00]"}
+command b_set_enemy_stat_var0(offset)	{"[58 01 {byte offset} 00 00]"}
+command b_set_enemy_stat_var1(offset)	{"[58 02 {byte offset} 00 00]"}
+command b_set_enemy_stat_var2(offset)	{"[58 03 {byte offset} 00 00]"}
+
+// missing [59] command
+
+command b_end	{"[5A]"}
+command b_asmcall(addr)		{"[5B {long addr}]"}
+
+// Utilities from movscr_codes
+command b_unlock_text		{"[5C]"}
+command b_rand_8bit			{"[5D 00]"}
+command b_rand_16bit		{"[5D 01]"}
+
+command b_toggle_flying(value)		{"[5E {short value}]"}
+
+command b_get_flying_speed_result	{"[5F 00]"}
+command b_get_flying_speed_var0		{"[5F 01]"}
+command b_get_flying_speed_var1		{"[5F 02]"}
+command b_get_flying_speed_var2		{"[5F 03]"}
+
+command b_set_flying_speed(value)			{"[60 FF {byte value}]"}
+command b_set_flying_speed_result			{"[60 00 00]"}
+command b_set_flying_speed_var0				{"[60 01 00]"}
+command b_set_flying_speed_var1				{"[60 02 00]"}
+command b_set_flying_speed_var2				{"[60 03 00]"}
+command b_set_flying_speed_mem8(addr)		{"[61 {short addr} 7E 00]"}
+command b_set_flying_speed_mem8_long(addr)	{"[61 {long addr}]"}
+command b_set_flying_speed_mem8_var01		{"[62]"}
+
+command b_get_flying_height_result	{"[63 00]"}
+command b_get_flying_height_var0	{"[63 01]"}
+command b_get_flying_height_var1	{"[63 02]"}
+command b_get_flying_height_var2	{"[63 03]"}
+
+command b_set_flying_height(value)			{"[64 FF {byte value}]"}
+command b_set_flying_height_result			{"[64 00 00]"}
+command b_set_flying_height_var0			{"[64 01 00]"}
+command b_set_flying_height_var1			{"[64 02 00]"}
+command b_set_flying_height_var2			{"[64 03 00]"}
+command b_set_flying_height_mem8(addr)		{"[65 {short addr} 7E 00]"}
+command b_set_flying_height_mem8_long(addr)	{"[65 {long addr}]"}
+command b_set_flying_height_mem8_var01		{"[66]"}
+
+command b_get_flying_counter_result	{"[67 00]"}
+command b_get_flying_counter_var0	{"[67 01]"}
+command b_get_flying_counter_var1	{"[67 02]"}
+command b_get_flying_counter_var2	{"[67 03]"}
+
+command b_set_flying_counter(value)			{"[68 FF {byte value}]"}
+command b_set_flying_counter_result			{"[68 00 00]"}
+command b_set_flying_counter_var0			{"[68 01 00]"}
+command b_set_flying_counter_var1			{"[68 02 00]"}
+command b_set_flying_counter_var2			{"[68 03 00]"}
+command b_set_flying_counter_mem8(addr)		{"[69 {short addr} 7E 00]"}
+command b_set_flying_counter_mem8_long(addr){"[69 {long addr}]"}
+command b_set_flying_counter_mem8_var01		{"[6A]"}
+command b_set_flying_counter_mem8_random	{"[6B]"}
+
+command b_cycle_palette_left	{"[6C]"}
+command b_cycle_palette_right	{"[6D]"}
+
+command b_get_half_palette_cycle_result	{"[6E 00]"}
+command b_get_half_palette_cycle_var0	{"[6E 01]"}
+command b_get_half_palette_cycle_var1	{"[6E 02]"}
+command b_get_half_palette_cycle_var2	{"[6E 03]"}
+
+command b_set_half_palette_cycle(value)			{"[6F FF {byte value}]"}
+command b_set_half_palette_cycle_result			{"[6F 00 00]"}
+command b_set_half_palette_cycle_var0			{"[6F 01 00]"}
+command b_set_half_palette_cycle_var1			{"[6F 02 00]"}
+command b_set_half_palette_cycle_var2			{"[6F 03 00]"}
+command b_set_half_palette_cycle_mem8(addr)		{"[70 {short addr} 7E 00]"}
+command b_set_half_palette_cycle_mem8_long(addr){"[70 {long addr}]"}
+command b_set_half_palette_cycle_var01			{"[71]"}
+
+command b_get_color_result(index)	{"[72 00 {byte index}]"}
+command b_get_color_var0(index)		{"[72 01 {byte index}]"}
+command b_get_color_var1(index)		{"[72 02 {byte index}]"}
+command b_get_color_var2(index)		{"[72 03 {byte index}]"}
+
+command b_set_color3(index, red, green, blue) {"[73 {byte index} {byte red} {byte green} {byte blue}]"}
+
+command b_set_color_16bit(index, value)		{"[74 FF {byte index} {short value}]"}
+command b_set_color_result(index)			{"[74 00 {byte index} 00 00]"}
+command b_set_color_var0(index)				{"[74 01 {byte index} 00 00]"}
+command b_set_color_var1(index)				{"[74 02 {byte index} 00 00]"}
+command b_set_color_var2(index)				{"[74 03 {byte index} 00 00]"}
+command b_set_color_mem16(addr, index)		{"[75 {byte index} {short addr} 7E 00]"}
+command b_set_color_mem16_long(addr, index)	{"[75 {byte index} {long addr}]"}
+command b_set_color_mem16_var01(index)		{"[76 {byte index}]"}
+
+command b_seperate_RGB_var012	{"[77]"}
+command b_combine_RGB(red, green, blue)	{"[78 {byte red} {byte green} {byte blue}]"}
+command b_combine_RGB_var012	{"[79]"}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+//+=+=+=+=+= ASM =+=+=+=+=+
+ROM[0xC2F729] = ADC_i (0xFFE0)	// Need some extra storage space for this routine here
+ROM[0xC2F801] = {
+	JSL (BAT_Parsesr)
+}
+
+ROM[0xC2F846] = {
+	JSL (BAT_Parsesr)
+}
+
+ROM[0xC2F89B] = {
+	JSL (BAT_Parsesr)
+}
+
+
+ROM[0xC2F8D5] = {
+	JSL (BAT_Parsesr)
+}
+
+// Located in 0xC2F121
+ROM[0xC2F544] = {
+	JSL (BAT_Animate_Enemy_Init)
+	NOP
+}
+
+/*
+	Entry point for the script to do all fancy stuff for the enemy sprites
+	Param: N/A
+	Return: N/A
+	
+	DPR 0x06, 0x08, 0x0A, 0x0C are unused in this routine we're JSL-ing out of
+*/
+define OAM_NORMAL_ENEMY_SPRITEMAP_ADDR = 0xAAD6
+define OAM_DARK_ENEMY_SPRITEMAP_ADDR = 0xAC16
+define OAM_NORMAL_TO_DARK_SPRITEMAP_DISTANCE = 0x0140
+define OAM_ENEMY_SPRITEMAP_MAX_SIZE = 0x50
+define SpritemapToOAM = 0xC08CD5
+
+define OAM_NORMAL_ENEMY_PALETTE_ADDR = 0x0300
+define OAM_DARK_ENEMY_PALETTE_ADDR = 0x0380
+define OAM_ENEMY_PALETTE_SIZE = 0x20
+define OAM_NORMAL_TO_DARK_PALETTE_DISTANCE = 0x80
+define OAM_ENEMY_PALETTE_ENTRY_SIZE = 0x02
+
+define BAT_P_VAR0 = 0x06
+define BAT_P_VAR1 = 0x08
+define BAT_P_VAR2 = 0x0A
+define BAT_P_VAR3 = 0x0C
+define BAT_P_VAR4 = 0x18
+define BAT_P_VAR5 = 0x1A
+define BAT_P_VAR6 = 0x1C
+define BAT_P_VAR7 = 0x1E
+
+define OAM_SPRITEMAP_YPOS_OFFSET = 0x00
+define OAM_SPRITEMAP_TILE_OFFSET = 0x01
+define OAM_SPRITEMAP_ATTR_OFFSET = 0x02
+	define OAM_SPRITEMAP_ATTR_VERT_BIT = 0x80
+	define OAM_SPRITEMAP_ATTR_HORI_BIT = 0x40
+	define OAM_SPRITEMAP_ATTR_PRIO_BIT_ALL = 0x30
+		define OAM_SPRITEMAP_ATTR_PRIO_BIT_HI = 0x20
+		define OAM_SPRITEMAP_ATTR_PRIO_BIT_LO = 0x10
+	define OAM_SPRITEMAP_ATTR_PAL_ID_BIT_ALL = 0x0E
+		define OAM_SPRITEMAP_ATTR_PAL_ID_BIT_HI = 0x80
+		define OAM_SPRITEMAP_ATTR_PAL_ID_BIT_MED = 0x40
+		define OAM_SPRITEMAP_ATTR_PAL_ID_BIT_LO = 0x20
+	define OAM_SPRITEMAP_ATTR_HI_MAP_BIT = 0x01
+define OAM_SPRITEMAP_XPOS_OFFSET = 0x03
+define OAM_SPRITEMAP_SETT_OFFSET = 0x04
+
+// MVN OPCode because asm65816.ccs doesn't have it
+command MVN(srcbk, destbk) {"[54 {byte srcbk} {byte destbk}]"}
+
+// Shortcut values to get the OAM byte size and amount of OAM... chunks(?) there are
+OAMSpritemapSizeTable:	{"[00 05 0A 0A 14 28 50]"}	// DON'T TOUCH!!!
+
+
+command OAMSpritemapFrameOffsetValue(frame, offset) "[{byte offset}]"
+SIZE_32x32_FrameOffsetTable:{
+	"[00 04 08 0C 40 44 48 4C 80 84 88 8C C0 C4 C8 CC]"
+}
+
+SIZE_64x32_FrameOffsetTable:{
+	"[00 08 40 48 80 88 C0 C8]"
+}
+
+SIZE_32x64_FrameOffsetTable:{
+	"[00 04 08 0C 80 84 88 8C]"
+}
+
+SIZE_64x64_FrameOffsetTable:{
+	"[00 08 80 88]"
+}
+
+SIZE_128x64_FrameOffsetTable: {
+	"[00 80]"
+}
+
+BAT_Parsesr: {
+	PHY		// ypos of the sprite
+	PHX		// xpos of the sprite
+	PHA		// Address of the OAM Spritemap
+	
+	LDA_d (0x02)
+	JSL (BAT_FindEntryAddr)
+	CMP_i (0xFFFF)
+	BEQ_a (OldCode)
+	
+	STA_d (BAT_P_VAR3)		// BAT_P_VAR3 = Address of the enemy's Animated Enemy List entry
+	
+	// Copies the OAM Spritemaps to ANIMATE_ENEMY_OAM_SCRATCH_ADDR
+	LDA_i (short[0] ANIM_TABLE_ADDR)
+	STA_d (BAT_P_VAR0)
+	LDA_i (short[1] ANIM_TABLE_ADDR)
+	STA_d (BAT_P_VAR1)
+	
+	LDX_d (0x02)
+	LDA_x (BATTLER_ID_OFFSET)
+	ASL
+	ASL
+	ASL
+	CLC
+	ADC_i (ANIM_TABLE_SPRITE_SIZE_OFFSET)
+	TAY
+	LDA_dly (BAT_P_VAR0)
+	AND_i (0x00FF)
+	STA_d (BAT_P_VAR2)		// BAT_P_VAR2 = Sprite Size
+	
+	INY
+	LDA_dly (BAT_P_VAR0)
+	AND_i (0x00FF)
+	STA_d (BAT_P_VAR4)		// BAT_P_VAR4 = Canvas Size
+	
+	LDY_d (BAT_P_VAR2)
+	
+	LDA_i (short[0] OAMSpritemapSizeTable)
+	STA_d (BAT_P_VAR0)
+	LDA_i (short[1] OAMSpritemapSizeTable)
+	STA_d (BAT_P_VAR1)
+	
+	LDA_dly (BAT_P_VAR0)
+	AND_i (0x00FF)
+	DEC
+	
+	PLX
+	//PHX		// Copy the OAM Spritemap address
+	LDY_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+	PHY			// Use our new address to load the OAM Spritemap
+	
+	MVN (0x7E, 0x7E)
+	
+	LDA_d (BAT_P_VAR3)
+	JSL (Batscr_Parser)
+	BEQ_a (OldCode)
+
+	// Update's the frame of the enemy to the current frame
+	LDA_d (BAT_P_VAR2)
+	CMP_i (AnimateEnemy_Main.SIZE_32x32)
+	BEQ_a (Is_SIZE_32x32)
+	CMP_i (AnimateEnemy_Main.SIZE_64x32)
+	BEQ_a (Is_SIZE_64x32)
+	CMP_i (AnimateEnemy_Main.SIZE_32x64)
+	BEQ_a (Is_SIZE_32x64)
+	CMP_i (AnimateEnemy_Main.SIZE_64x64)
+	BEQ_a (Is_SIZE_64x64)
+	CMP_i (AnimateEnemy_Main.SIZE_128x64)
+	BEQ_a (Is_SIZE_128x64)
+	CMP_i (AnimateEnemy_Main.SIZE_128x128)
+	BEQ_a (Is_SIZE_128x128)
+	BRA_a (OldCode)	// No defined sprite size for this enemy
+	
+	Is_SIZE_32x32:
+		LDX_d (BAT_P_VAR3)
+		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+		AND_i (0x00FF)
+		TAX	
+		LDA_xl (SIZE_32x32_FrameOffsetTable)
+		AND_i (0x00FF)
+		
+		JSL (BAT_Parsesr_Update_Frame)
+		BRA_a (Update_Spritemap_Attr)
+		
+	
+	Is_SIZE_64x32:
+		LDX_d (BAT_P_VAR3)
+		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+		AND_i (0x00FF)
+		TAX	
+		LDA_xl (SIZE_64x32_FrameOffsetTable)
+		AND_i (0x00FF)
+		
+		JSL (BAT_Parsesr_Update_Frame)
+		BRA_a (Update_Spritemap_Attr)
+	
+	Is_SIZE_32x64:
+		LDX_d (BAT_P_VAR3)
+		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+		AND_i (0x00FF)
+		TAX	
+		LDA_xl (SIZE_32x64_FrameOffsetTable)
+		AND_i (0x00FF)
+		
+		JSL (BAT_Parsesr_Update_Frame)
+		BRA_a (Update_Spritemap_Attr)
+	
+	Is_SIZE_64x64:
+		LDX_d (BAT_P_VAR3)
+		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+		AND_i (0x00FF)
+		TAX	
+		LDA_xl (SIZE_64x64_FrameOffsetTable)
+		AND_i (0x00FF)
+		
+		JSL (BAT_Parsesr_Update_Frame)
+		BRA_a (Update_Spritemap_Attr)
+		
+		
+	Is_SIZE_128x64:
+		LDX_d (BAT_P_VAR3)
+		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+		AND_i (0x00FF)
+		TAX	
+		LDA_xl (SIZE_128x64_FrameOffsetTable)
+		AND_i (0x00FF)
+		
+		JSL (BAT_Parsesr_Update_Frame)
+		BRA_a (Update_Spritemap_Attr)
+	
+	Is_SIZE_128x128:
+		BRA_a (Update_Spritemap_Attr) // Not doable... yet...
+	
+Update_Spritemap_Attr:
+	JSL (BAT_Parser_Fix_Horizontal)
+	JSL (BAT_Parser_Fix_Vertical)
+
+	LDX_d (BAT_P_VAR3)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (0x00FE)
+	STA_d (BAT_P_VAR5)	// BAT_P_VAR5 = Attribute byte
+	
+	LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+	SEP (0x20)
+	
+Update_Spritemap_Attr_Loop:
+	LDA_x (OAM_SPRITEMAP_ATTR_OFFSET)
+	AND_8 (0x09)		// Filter out the darken and high OAM bits
+	ORA_d (BAT_P_VAR5)
+	STA_x (OAM_SPRITEMAP_ATTR_OFFSET)
+	
+	LDA_x (OAM_SPRITEMAP_SETT_OFFSET)
+	AND_8 (0x0080)
+	BNE_a (OldCode)
+	
+	INX
+	INX
+	INX
+	INX
+	INX
+	
+	BRA_a (Update_Spritemap_Attr_Loop)
+	
+OldCode:
+	REP (0x20)
+	// Old Code
+	PLA
+	PLX
+	PLY
+	JSL (SpritemapToOAM)
+	RTL
+}
+
+/*
+	Updates the frame of the sprite
+	Param: A = Offset value for each frame in OAM
+	Return: N/A
+*/
+
+BAT_Parsesr_Update_Frame: {
+	STA_d (BAT_P_VAR5)
+	LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+	
+OAM_Loop:
+	LDA_x (OAM_SPRITEMAP_TILE_OFFSET)
+	CLC
+	ADC_d (BAT_P_VAR5)
+	
+	TAY
+	AND_i (0x0030)	// Check if we are aligned correctly
+	BEQ_a (OAM_Loop_Store_Frame) // If so, then no need to correct
+	
+	TYA
+	CLC
+	ADC_i (0x0040)	// Else, we snap the alignment 
+	AND_i (0xFFCF)	// Get rid of any odd alignment
+	TAY
+		
+OAM_Loop_Store_Frame:
+	TYA
+	STA_x (OAM_SPRITEMAP_TILE_OFFSET)
+	
+	LDA_x (OAM_SPRITEMAP_SETT_OFFSET)
+	AND_i (0x0080)
+	BNE_a (OAM_Loop_End)
+	
+	INX
+	INX
+	INX
+	INX
+	INX		// Go to the next OAM Spritemap entry
+	
+	BRA_a (OAM_Loop)
+	
+OAM_Loop_End:
+	RTL
+}
+
+/*
+	Fixes the enemy's horizontal sprite to be in the correct order
+	Param: N/A
+	Return: N/A
+*/
+BAT_Parser_Fix_Horizontal: {
+	LDX_d (BAT_P_VAR3)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_HORIZONTAL_BIT)
+	BEQ_a (Return)
+	
+	LDA_d (BAT_P_VAR2)
+	CMP_i (AnimateEnemy_Main.SIZE_64x32)
+	BEQ_a (Is_SIZE_64x32)
+	CMP_i (AnimateEnemy_Main.SIZE_64x64)
+	BEQ_a (Is_SIZE_64x64)
+	CMP_i (AnimateEnemy_Main.SIZE_128x64)
+	BEQ_a (Is_SIZE_128x64)
+	CMP_i (AnimateEnemy_Main.SIZE_128x128)
+	BEQ_a (Is_SIZE_128x128)
+	BRA_a (Return)
+	
+	Is_SIZE_64x32:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		LDA_x (1)
+		XBA
+		LDA_x (6)
+		XBA
+		STA_x (6)
+		XBA
+		STA_x (1)
+		
+		BRA_a (Return)
+		
+	Is_SIZE_64x64:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		LDA_x (1)
+		XBA
+		LDA_x (6)
+		XBA
+		STA_x (6)
+		XBA
+		STA_x (1)
+		
+		LDA_x (11)
+		XBA
+		LDA_x (16)
+		XBA
+		STA_x (16)
+		XBA
+		STA_x (11)
+		
+		BRA_a (Return)
+	
+	Is_SIZE_128x64:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		LDA_x (1)
+		XBA
+		LDA_x (16)
+		XBA
+		STA_x (16)
+		XBA
+		STA_x (1)
+		
+		LDA_x (6)
+		XBA
+		LDA_x (11)
+		XBA
+		STA_x (11)
+		XBA
+		STA_x (6)
+		
+		LDA_x (21)
+		XBA
+		LDA_x (36)
+		XBA
+		STA_x (36)
+		XBA
+		STA_x (21)
+		
+		LDA_x (26)
+		XBA
+		LDA_x (31)
+		XBA
+		STA_x (31)
+		XBA
+		STA_x (26)
+		
+		BRA_a (Return)
+	
+	Is_SIZE_128x128:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		// 1st Row
+		LDA_x (1)
+		XBA
+		LDA_x (16)
+		XBA
+		STA_x (16)
+		XBA
+		STA_x (1)
+		
+		LDA_x (6)
+		XBA
+		LDA_x (11)
+		XBA
+		STA_x (11)
+		XBA
+		STA_x (6)
+		
+		// 2nd Row
+		LDA_x (21)
+		XBA
+		LDA_x (36)
+		XBA
+		STA_x (36)
+		XBA
+		STA_x (21)
+		
+		LDA_x (26)
+		XBA
+		LDA_x (31)
+		XBA
+		STA_x (31)
+		XBA
+		STA_x (26)
+		
+		// 3rd Row
+		LDA_x (41)
+		XBA
+		LDA_x (56)
+		XBA
+		STA_x (56)
+		XBA
+		STA_x (41)
+		
+		LDA_x (46)
+		XBA
+		LDA_x (51)
+		XBA
+		STA_x (51)
+		XBA
+		STA_x (46)
+		
+		// 4th Row
+		LDA_x (61)
+		XBA
+		LDA_x (76)
+		XBA
+		STA_x (76)
+		XBA
+		STA_x (61)
+		
+		LDA_x (66)
+		XBA
+		LDA_x (71)
+		XBA
+		STA_x (71)
+		XBA
+		STA_x (66)
+	
+Return:
+	REP (0x20)
+	RTL
+}
+
+/*
+	Fixes the enemy's vertical sprite to be in the correct order
+	Param: N/A
+	Return: N/A
+*/
+BAT_Parser_Fix_Vertical: {
+	LDX_d (BAT_P_VAR3)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_VERTICAL_BIT)
+	BEQ_a (Return)
+	
+	LDA_d (BAT_P_VAR2)
+	CMP_i (AnimateEnemy_Main.SIZE_32x64)
+	BEQ_a (Is_SIZE_32x64)
+	CMP_i (AnimateEnemy_Main.SIZE_64x64)
+	BEQ_a (Is_SIZE_64x64)
+	CMP_i (AnimateEnemy_Main.SIZE_128x64)
+	BEQ_a (Is_SIZE_128x64)
+	CMP_i (AnimateEnemy_Main.SIZE_128x128)
+	BEQ_a (Is_SIZE_128x128)
+	BRA_a (Return)
+	
+	Is_SIZE_32x64:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		LDA_x (1)
+		CLC
+		ADC_8 (0x40)
+		STA_x (1)
+		
+		LDA_x (6)
+		SEC
+		SBC_8 (0x40)
+		STA_x (6)
+		
+		BRA_a (Return)
+		
+	Is_SIZE_64x64:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		LDA_x (1)
+		CLC
+		ADC_8 (0x40)
+		STA_x (1)
+		
+		LDA_x (6)
+		SEC
+		SBC_8 (0x40)
+		STA_x (6)
+		
+		LDA_x (11)
+		CLC
+		ADC_8 (0x40)
+		STA_x (11)
+		
+		LDA_x (16)
+		SEC
+		SBC_8 (0x40)
+		STA_x (16)
+		
+		BRA_a (Return)
+	
+	Is_SIZE_128x64:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		LDA_x (1)
+		CLC
+		ADC_8 (0x40)
+		STA_x (1)
+		
+		LDA_x (6)
+		SEC
+		SBC_8 (0x40)
+		STA_x (6)
+		
+		LDA_x (11)
+		CLC
+		ADC_8 (0x40)
+		STA_x (11)
+		
+		LDA_x (16)
+		SEC
+		SBC_8 (0x40)
+		STA_x (16)
+		
+		LDA_x (21)
+		CLC
+		ADC_8 (0x40)
+		STA_x (1)
+		
+		LDA_x (26)
+		SEC
+		SBC_8 (0x40)
+		STA_x (6)
+		
+		LDA_x (31)
+		CLC
+		ADC_8 (0x40)
+		STA_x (31)
+		
+		LDA_x (36)
+		SEC
+		SBC_8 (0x40)
+		STA_x (36)
+		
+		BRA_a (Return)
+	
+	Is_SIZE_128x128:
+		SEP (0x20)
+		LDX_i (ANIMATE_ENEMY_OAM_SCRATCH_ADDR)
+		
+		// 1st Row
+		LDA_x (1)
+		CLC
+		ADC_8 (0xC0)
+		STA_x (1)
+		
+		LDA_x (6)
+		SEC
+		ADC_8 (0xC0)
+		STA_x (6)
+		
+		LDA_x (11)
+		CLC
+		ADC_8 (0xC0)
+		STA_x (11)
+		
+		LDA_x (16)
+		SEC
+		ADC_8 (0xC0)
+		STA_x (16)
+		
+		// 2nd Row
+		LDA_x (21)
+		CLC
+		ADC_8 (0x40)
+		STA_x (21)
+		
+		LDA_x (26)
+		SEC
+		ADC_8 (0x40)
+		STA_x (26)
+		
+		LDA_x (31)
+		CLC
+		ADC_8 (0x40)
+		STA_x (31)
+		
+		LDA_x (36)
+		SEC
+		ADC_8 (0x40)
+		STA_x (36)
+		
+		// 3rd Row
+		LDA_x (41)
+		SEC
+		SBC_8 (0x40)
+		STA_x (41)
+		
+		LDA_x (46)
+		SEC
+		SBC_8 (0x40)
+		STA_x (46)
+		
+		LDA_x (51)
+		SEC
+		SBC_8 (0x40)
+		STA_x (51)
+		
+		LDA_x (56)
+		SEC
+		SBC_8 (0x40)
+		STA_x (56)
+	
+		// 4th Row
+		LDA_x (61)
+		SEC
+		SBC_8 (0xC0)
+		STA_x (61)
+		
+		LDA_x (66)
+		SEC
+		SBC_8 (0xC0)
+		STA_x (66)
+		
+		LDA_x (71)
+		SEC
+		SBC_8 (0xC0)
+		STA_x (71)
+		
+		LDA_x (76)
+		SEC
+		SBC_8 (0xC0)
+		STA_x (76)
+		
+Return:
+	REP (0x20)
+	RTL
+}
+
+/*
+	Initializes the enemy's animation data if they can animate
+	Param: N/A
+	Return: N/A
+*/
+define BATTLER_LIST_HEAD_ADDR = 0x9FAC
+BAT_Animate_Enemy_Init: {
+	PHA
+	PHX
+	PHY
+
+	TXA
+	CLC
+	ADC_i (BATTLER_LIST_HEAD_ADDR)
+	JSL (Batscr_Init)
+	
+OldCode:
+	PLY
+	PLX
+	PLA
+
+	LDA_d (0x14)
+	INC
+	STA_d (0x14)
+	RTL
+}
+
+/*
+	Finds the enemy's index into the AnimateEnemy list
+	Param: A = Enemy's Battler's Address
+	Return: A = Index of the AnimateEnemy list
+			    Returns 0xFFFF if not in the list
+*/
+define BATTLER_ENTRY_SIZE = 0x004E
+define BATTLER_ENEMY_LIST_ADDR = 0xA21C
+define MAX_ENEMIES = 0x0008
+
+define BAT_FEI_TARGET_ADDR = 0x02
+define BAT_FEI_ITER = 0x04
+define BAT_FEI_CURR_ADDR = 0x06
+BAT_FindEntryIndex: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFEE)
+	TCD
+	PLA
+	
+	STA_d (BAT_FEI_TARGET_ADDR)
+	STZ_d (BAT_FEI_ITER)
+	LDA_i (BATTLER_ENEMY_LIST_ADDR)
+	STA_d (BAT_FEI_CURR_ADDR)
+Loop:
+	LDA_d (BAT_FEI_CURR_ADDR)
+	CMP_d (BAT_FEI_TARGET_ADDR)
+	BEQ_a (Return)
+	
+	LDA_d (BAT_FEI_ITER)
+	INC
+	CMP_i (MAX_ENEMIES)
+	BEQ_a (NotInList)
+	
+	LDA_d (BAT_FEI_CURR_ADDR)
+	CLC
+	ADC_i (BATTLER_ENTRY_SIZE)
+	STA_d (BAT_FEI_CURR_ADDR)
+	BRA_a (Loop)
+
+NotInList:
+	LDA_i (0xFFFF)
+	STA_d (BAT_FEI_ITER)
+
+Return:	
+	LDA_d (BAT_FEI_ITER)
+	
+	PLD
+	RTL
+}
+
+/*
+	Finds the enemy's index into the AnimateEnemy list
+	Param: A = Enemy's Battler's Address
+	Return: A = The addres of that entry from the list
+				Returns 0xFFFF if the enemy doens't exists
+*/
+define Mul16x8r16 = 0xC08FF7
+
+define BAT_FEA_BATTLER_ENEMY_ADDR = 0x02
+BAT_FindEntryAddr: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFFE)
+	TCD
+	PLA
+	
+	STA_d (BAT_FEA_BATTLER_ENEMY_ADDR)
+	LDX_i (ANIMATE_ENEMY_LIST_ADDR)
+	LDY_i (MAX_ENEMIES)
+Loop:
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	CMP_d (BAT_FEA_BATTLER_ENEMY_ADDR)
+	BEQ_a (Return)
+	
+	TXA
+	CLC
+	ADC_i (ANIMATE_ENEMY_ENTRY_SIZE)
+	TAX
+	
+	DEY
+	CPY_i (0x0000)
+	BNE_a (Loop)
+	
+	LDX_i (0xFFFF)
+	
+Return:
+	TXA
+	PLD
+	RTL
+}
+
+/*
+	Finds a free entry within the list
+	Param: N/A
+	Return: A = Address of that entry
+				Returns 0xFFFF if there is none
+*/
+BAT_FindFreeEntry: {
+	LDY_i (MAX_ENEMIES)
+	LDX_i (ANIMATE_ENEMY_LIST_ADDR)
+	
+Loop:
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	BEQ_a (Return)
+	
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_i (0x0080)	// IF killswitch is on, then overwrite this entry
+	BNE_a (Return)
+	
+	TXA
+	CLC
+	ADC_i (ANIMATE_ENEMY_ENTRY_SIZE)
+	TAX
+	
+	DEY
+	CPY_i (0x0000)
+	BNE_a (Loop)
+	
+	LDX_i (0xFFFF)
+	
+Return:
+	TXA
+	RTL
+}
+
+
+/*
+	This initializes each enemy into the Animate Enemy List
+	Param: A = Enemy's Battler's address
+	Return: N/A
+*/
+define AE_SCRIPT_BATTLER_ADDR = 0x00
+define AE_PALETTE_POINTER_LO_OFFSET = 0x02
+define AE_PALETTE_POINTER_HI_OFFSET = 0x04
+define AE_SCRIPT_PC_LO_OFFSET = 0x05
+define AE_SCRIPT_PC_HI_OFFSET = 0x07
+define AE_SCRIPT_RESULT_OFFSET = 0x08
+define AE_SCRIPT_VAR0_OFFSET = 0x0A
+define AE_SCRIPT_VAR1_OFFSET = 0x0C
+define AE_SCRIPT_VAR2_OFFSET = 0x0E
+define AE_SCRIPT_BASE_XPOS_OFFSET = 0x10
+define AE_SCRIPT_BASE_YPOS_OFFSET = 0x11
+define AE_SCRIPT_CURRENT_FRAME_OFFSET = 0x12
+define AE_SCRIPT_PAUSE_FRAME_OFFSET = 0x13
+define AE_SCRIPT_PALETTE_CYCLE_RATE_OFFSET = 0x14
+define AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET = 0x15
+define AE_SCRIPT_FLYING_HEIGHT_OFFSET = 0x16
+define AE_SCRIPT_FLYING_SPEED_OFFSET = 0x17
+define AE_SCRIPT_FLYING_COUNTER_OFFSET = 0x18
+define AE_SCRIPT_ATTRIBUTES_OFFSET = 0x19
+define	AE_SCRIPT_ATTRIBUTES_VERTICAL_BIT = 0x80
+define	AE_SCRIPT_ATTRIBUTES_HORIZONTAL_BIT = 0x40
+define	AE_SCRIPT_ATTRIBUTES_PRIORITY_DRAW_BIT_ALL = 0x30
+define		AE_SCRIPT_ATTRIBUTES_PRIORITY_DRAW_BIT_HI = 0x20
+define		AE_SCRIPT_ATTRIBUTES_PRIORITY_DRAW_BIT_LO = 0x10
+define	AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL = 0x0E
+define		AE_SCRIPT_ATTRIBUTES_PALETTE_ID_BIT_HI = 0x08
+define		AE_SCRIPT_ATTRIBUTES_PALETTE_ID_BIT_MED = 0x04
+define		AE_SCRIPT_ATTRIBUTES_PALETTE_ID_BIT_LO = 0x02
+define	AE_SCRIPT_ATTRIBUTES_USE_OAM_HI_BIT = 0x01
+	
+define AE_SCRIPT_SETTINGS_OFFSET = 0x1A
+	define AE_SCRIPT_SETTINGS_KILLSWITCH_BIT = 0x80
+	define AE_SCRIPT_SETTINGS_SOFT_TOGGLE_BIT = 0x40
+	define AE_SCRIPT_SETTINGS_FLYING_BIT	= 0x20
+	define AE_SCRIPT_SETTINGS_CYCLE_PALETTE_BIT = 0x10
+	define AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT = 0x08
+
+define ANIM_TABLE_ADDR = AnimateEnemy_Main.AnimationTable
+define ANIM_TABLE_MAX_FRAME_OFFSET = 0x00
+define ANIM_TABLE_SPRITE_SIZE_OFFSET = 0x01
+define ANIM_TABLE_CANVAS_SIZE_OFFSET = 0x02
+define ANIM_TABLE_SCRIPT_OFFSET = 0x04
+
+define BATTLER_ID_OFFSET = 0x00
+define BATTLER_EXISTANCE_OFFSET = 0x0C
+define BATTLER_IS_ENEMY_OFFSET = 0x0E
+define BATTLER_OAM_SPRITE_ID_OFFSET = 0x43
+define BATTLER_XPOS_OFFSET = 0x44
+define BATTLER_YPOS_OFFSET = 0x45
+
+define INIT_ENEMY_BATTLER_ADDR = 0x02
+define INIT_ANIM_ENEMY_ENTRY_ADDR = 0x04
+define INIT_ANIM_TABLE_LO_ADDR = 0x06
+define INIT_ANIM_TABLE_HI_ADDR = 0x08
+Batscr_Init: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFEE)
+	TCD
+	PLA	
+
+	STA_d (INIT_ENEMY_BATTLER_ADDR)
+	TAX
+
+	// Does the batter exists? If not then skip them
+	LDA_x (BATTLER_EXISTANCE_OFFSET)
+	AND_i (0x00FF)
+	BEQ_a (Return)
+	
+	// Are they an enemy? If not then skip them
+	LDA_x (BATTLER_IS_ENEMY_OFFSET)
+	AND_i (0x00FF)
+	BEQ_a (Return)
+	
+	// Find a free entry in the Animate Enemy List
+	LDA_d (INIT_ENEMY_BATTLER_ADDR)
+	JSL (BAT_FindFreeEntry)
+	CMP_i (0xFFFF)
+	BEQ_a (Return)
+	
+	STA_d (INIT_ANIM_ENEMY_ENTRY_ADDR)
+	TAX
+	
+	// Init Script address to enemy. If script doesn't exists, then don't load them in. 
+	LDA_i (short[0] ANIM_TABLE_ADDR)
+	STA_d (INIT_ANIM_TABLE_LO_ADDR)
+	LDA_i (short[1] ANIM_TABLE_ADDR)
+	STA_d (INIT_ANIM_TABLE_HI_ADDR)
+	
+	LDX_d (INIT_ENEMY_BATTLER_ADDR)
+	LDA_x (BATTLER_ID_OFFSET)
+	ASL
+	ASL
+	ASL
+	CLC
+	ADC_i (ANIM_TABLE_SCRIPT_OFFSET)
+	INC
+	INC		// Get HI address first, guarentees us script is there or not
+	TAY
+	LDA_dly (INIT_ANIM_TABLE_LO_ADDR)
+	BEQ_a (Return)	// No Script label associated with this enemy if 0
+	
+	LDX_d (INIT_ANIM_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_PC_HI_OFFSET)
+	DEY
+	DEY		// Get LO address next
+	LDA_dly (INIT_ANIM_TABLE_LO_ADDR)
+	STA_x (AE_SCRIPT_PC_LO_OFFSET)
+	
+	// Init the battler's address to the entry
+	LDA_d (INIT_ENEMY_BATTLER_ADDR)
+	LDX_d (INIT_ANIM_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_BATTLER_ADDR)
+	
+	// Copy base X and Y pos of enemies to the entry
+	LDX_d (INIT_ENEMY_BATTLER_ADDR)
+	LDA_x (BATTLER_XPOS_OFFSET)	// Since A is 16-bit, we load in x and y pos
+	LDX_d (INIT_ANIM_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_BASE_XPOS_OFFSET)
+	
+	LDX_d (INIT_ENEMY_BATTLER_ADDR)
+	LDA_x (BATTLER_OAM_SPRITE_ID_OFFSET)
+	AND_i(0x00FF)
+	TAY
+	LDA_i (OAM_ENEMY_SPRITEMAP_MAX_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_SPRITEMAP_ADDR)
+	TAX
+	LDA_x (OAM_SPRITEMAP_ATTR_OFFSET)
+	AND_i (0x00FF)
+	
+	SEP (0x20)
+	LDX_d (INIT_ANIM_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	REP (0x20)
+	
+	// Zero out all other settings
+	LDA_i (0x0000)
+	STA_x (AE_PALETTE_POINTER_LO_OFFSET)
+	STA_x (AE_SCRIPT_RESULT_OFFSET)
+	STA_x (AE_SCRIPT_VAR0_OFFSET)
+	STA_x (AE_SCRIPT_VAR1_OFFSET)
+	STA_x (AE_SCRIPT_VAR2_OFFSET)
+	SEP (0x20)
+	STA_x (AE_PALETTE_POINTER_HI_OFFSET)
+	STA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	STA_x (AE_SCRIPT_PAUSE_FRAME_OFFSET)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_RATE_OFFSET)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	STA_x (AE_SCRIPT_FLYING_HEIGHT_OFFSET)
+	STA_x (AE_SCRIPT_FLYING_SPEED_OFFSET)
+	STA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	REP (0x20)
+
+Return:
+	PLD
+	RTL
+}
+
+/*
+	RAM Ranges:
+	https://gist.github.com/Supremekirb/33089ef23ef1e3677d80f38479e4cb2e
+	
+	The Animate Enemy List will take up the unused space in RAM at 0x0720
+	Using RAM Range: 0x0720 - 0x07E8 (200 bytes)
+	Free RAM Range: 0x07E9 - 0x07FF (24 bytes)
+	
+	The OAM scratch will also take up this amount of space:
+	Using RAM Range: 0x3248 - 0x3298 (80 bytes) // RAM address right after movscr_codes.ccs
+	Free RAM RAnge: 0x3299 - 0x3329 (145 Bytes)
+	
+	Does all of the parsing of the commands for this enemy
+	Param:	A = Enemy's address entry to the Animate Enemy List
+	Return: A = Was the enemy able to run its script or pause?
+			    0 = False, 1 = True
+		   
+*/
+define ANIMATE_ENEMY_LIST_ADDR = 0x0720
+define ANIMATE_ENEMY_OAM_SCRATCH_ADDR = 0x3248
+define ANIMATE_ENEMY_ENTRY_SIZE = 0x1B
+
+define JSL_LongJump_00BC = 0xC09279
+define RAM_JUMP_LO_ADDR = 0x00BC
+define RAM_JUMP_HI_ADDR = 0x00BE
+
+define PARSER_ANIMATE_ENEMY_ENTRY_ADDR = 0x02
+define PARSER_BYTE_CODE_TABLE_LO_ADDR = 0x04
+define PARSER_BYTE_CODE_TABLE_HI_ADDR = 0x06
+define PARSER_SCRIPT_PC_LO_ADDR = 0x08
+define PARSER_SCRIPT_PC_HI_ADDR = 0x0A
+define PARSER_BYTE_CODE_PARAM_1 = 0x0C
+define PARSER_BYTE_CODE_PARAM_2 = 0x0E
+define PARSER_BYTE_CODE_PARAM_3 = 0x10
+define PARSER_BYTE_CODE_PARAM_4 = 0x12
+define PARSER_BYTE_CODE_PARAM_5 = 0x14
+define PARSER_BYTE_CODE_PARAM_6 = 0x16
+define PARSER_BYTE_CODE_PARAM_7 = 0x18
+define PARSER_TEMP_VAR_1 = 0x1A
+define PARSER_TEMP_VAR_2 = 0x1C
+define PARSER_TEMP_VAR_3 = 0x1E
+define PARSER_TEMP_VAR_4 = 0x20
+
+Batscr_Parser: {
+	REP (0x31)
+	PHD
+	PHA
+	TDC
+	ADC_i (0xFFDE)
+	TCD
+	PLA
+	TAX
+	
+	STX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	
+Check_Flying:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_8 (AE_SCRIPT_SETTINGS_FLYING_BIT)
+	BEQ_a (Check_Palette_Cycle)
+	
+	
+	// Enemy is flying
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_FLYING_SPEED_OFFSET)
+	AND_i (0x00FF)
+	TAY
+	LDA_a (0x0002)	// 8bit frame counter
+	AND_i (0x00FF)
+	JSL (0xC09231)	// Mod16_Unsigned
+	CMP_i (0x0000)
+	BNE_a (Check_Palette_Cycle)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	AND_i (0x007F)
+	
+	TAX
+	LDA_xl (0xC0B425)
+	AND_i (0x00FF)
+	TAY
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_FLYING_HEIGHT_OFFSET)
+	AND_i (0x00FF)
+	TAY
+	LDA_d (PARSER_TEMP_VAR_1)
+	JSL (0xC0914B) 	// Divide_YxA
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	AND_i (0x0080)
+	BNE_a (Check_Flying_Going_Down)
+	
+	LDA_d (PARSER_TEMP_VAR_1)
+	EOR_i (0xFFFF)
+	INC
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Check_Flying_Going_Down:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BASE_YPOS_OFFSET)
+	AND_i (0x00FF)
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	AND_i (0x00FF)
+	TAY
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	TYA
+	
+	SEP (0x20)
+	STA_x (BATTLER_YPOS_OFFSET)
+	
+Check_Flying_Increment:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	INC
+	STA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	
+Check_Palette_Cycle:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_8 (AE_SCRIPT_SETTINGS_CYCLE_PALETTE_BIT)
+	BEQ_a (Check_Killswitch)
+	
+	LDA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	INC
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	
+	LDA_x (AE_SCRIPT_PALETTE_CYCLE_RATE_OFFSET)
+	SEC
+	SBC_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	BNE_a (Check_Killswitch)
+	
+Check_Palette_Cycle_Loop_Init:
+	REP (0x20)
+
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_i (AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT)
+	BEQ_a (Check_Palette_Cycle_Loop_Use_Full_Palette)
+	
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	LSR
+	STA_d (PARSER_TEMP_VAR_4)
+	BRA_a (Check_Palette_Cycle_Loop_Init_2)
+	
+Check_Palette_Cycle_Loop_Use_Full_Palette:
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	STA_d (PARSER_TEMP_VAR_4)
+	
+Check_Palette_Cycle_Loop_Init_2:
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	INC
+	INC		// Start on the 1st palette color, the 0th is the transparency
+	STA_d (PARSER_TEMP_VAR_1)
+	TAX
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	LDY_i (0x0004)
+
+Check_Palette_Cycle_Loop:
+	CPY_d (PARSER_TEMP_VAR_4)
+	BEQ_a (Check_Palette_Cycle_Loop_End)
+	
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0002)
+	LDA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	INY
+	INY
+	
+	BRA_a (Check_Palette_Cycle_Loop)
+	
+Check_Palette_Cycle_Loop_End:
+	LDA_d (PARSER_TEMP_VAR_1)
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	LDY_i (0x0004)
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+Check_Dark_Palette_Cycle_Loop:
+	CPY_d (PARSER_TEMP_VAR_4)
+	BEQ_a (Check_Dark_Palette_Cycle_Loop_End)
+	
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0002)
+	LDA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	INY
+	INY
+	
+	BRA_a (Check_Dark_Palette_Cycle_Loop)
+	
+Check_Dark_Palette_Cycle_Loop_End:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	LDA_8 (0x00)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	
+Check_Palette_Cycle_Zero_Others:
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STX_d (PARSER_TEMP_VAR_1)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_ID_OFFSET)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_i (ANIMATE_ENEMY_LIST_ADDR)
+	STA_d (PARSER_TEMP_VAR_3)
+	LDY_i (0x0000)
+
+Check_Palette_Cycle_Zero_Others_Loop:
+	CPY_i (0x0008)
+	BEQ_a (Check_Killswitch)
+	
+	LDA_d (PARSER_TEMP_VAR_3)
+	CMP_d (PARSER_TEMP_VAR_1)
+	BEQ_a (Check_Palette_Cycle_Check_Next_Enemy)	// Checks if the same enemy
+	
+	TAX
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_ID_OFFSET)
+	CMP_d (PARSER_TEMP_VAR_2)
+	BNE_a (Check_Palette_Cycle_Check_Next_Enemy)	// Checks if the same type enemy
+	
+	LDX_d (PARSER_TEMP_VAR_1)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	STA_d (PARSER_TEMP_VAR_4)
+	
+	LDX_d (PARSER_TEMP_VAR_3)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	CMP_d (PARSER_TEMP_VAR_4)
+	BNE_a (Check_Palette_Cycle_Check_Next_Enemy)	// Checks if using the same palette ID
+	
+	SEP (0x20)
+	LDX_d (PARSER_TEMP_VAR_3)
+	LDA_8 (0x00)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	REP (0x20)
+	
+Check_Palette_Cycle_Check_Next_Enemy:
+	INY
+	
+	LDA_d (PARSER_TEMP_VAR_3)
+	CLC
+	ADC_i (ANIMATE_ENEMY_ENTRY_SIZE)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	BRA_a (Check_Palette_Cycle_Zero_Others_Loop)
+	
+Check_Killswitch:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_8 (AE_SCRIPT_SETTINGS_KILLSWITCH_BIT)	// Focus only on the Setting's kill switch 
+	BEQ_a (Check_SoftToggle)	// If they're not on, then go to the next 
+	
+	LDY_i (0x0000)
+	BRA_a (Return)	// Do nothing to the enemy and return
+	
+Check_SoftToggle:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_8 (AE_SCRIPT_SETTINGS_SOFT_TOGGLE_BIT)
+	BEQ_a (Check_If_Pause)
+	
+	LDY_i (0x0001)
+	BRA_a (Return)	// Do nothing to the enemy and return
+	
+Check_If_Pause:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_PAUSE_FRAME_OFFSET)
+	BEQ_a (Main)
+	
+	DEC
+	STA_x (AE_SCRIPT_PAUSE_FRAME_OFFSET)
+	LDY_i (0x0001)
+	BRA_a (Return)
+	
+Main:
+	REP (0x20)
+	
+	// Fetch the byte code of the script
+	LDA_x (AE_SCRIPT_PC_LO_OFFSET)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+	LDA_x (AE_SCRIPT_PC_HI_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_SCRIPT_PC_HI_ADDR)
+	CMP_i (0x0000)
+	BEQ_a (Return)
+	
+	LDA_i (short[0] ByteCodeJumpTable)
+	STA_d (PARSER_BYTE_CODE_TABLE_LO_ADDR)
+	LDA_i (short[1] ByteCodeJumpTable)
+	STA_d (PARSER_BYTE_CODE_TABLE_HI_ADDR)
+	
+	LDA_dl (PARSER_SCRIPT_PC_LO_ADDR)
+	AND_i (0x00FF)
+	ASL
+	ASL
+	TAY
+	LDA_dly (PARSER_BYTE_CODE_TABLE_LO_ADDR)
+	STA_a (RAM_JUMP_LO_ADDR)
+	INY
+	INY
+	LDA_dly (PARSER_BYTE_CODE_TABLE_LO_ADDR)
+	AND_i (0x00FF)
+	STA_a (RAM_JUMP_HI_ADDR)
+	
+	INC_d (PARSER_SCRIPT_PC_LO_ADDR)	// INC PC, reading parameter bytes
+	
+	JSL (JSL_LongJump_00BC)
+	
+	BRA_a (Check_Killswitch)
+		
+Return:
+	REP (0x20)
+	TYA
+	
+	PLD
+	RTL
+}
+
+ByteCodeJumpTable: {
+	long BYTECODE_00
+	long BYTECODE_01
+	long BYTECODE_02
+	long BYTECODE_03
+	long BYTECODE_04
+	long BYTECODE_05
+	long BYTECODE_06
+	long BYTECODE_07
+	long BYTECODE_08
+	long BYTECODE_09
+	long BYTECODE_0A
+	long BYTECODE_0B
+	long BYTECODE_0C
+	long BYTECODE_0D
+	long BYTECODE_0E
+	long BYTECODE_0F
+	long BYTECODE_10
+	long BYTECODE_11
+	long BYTECODE_12
+	long BYTECODE_13
+	long BYTECODE_14
+	long BYTECODE_15
+	long BYTECODE_16
+	long BYTECODE_17
+	long BYTECODE_18
+	long BYTECODE_19
+	long BYTECODE_1A
+	long BYTECODE_1B
+	long BYTECODE_1C
+	long BYTECODE_1D
+	long BYTECODE_1E
+	long BYTECODE_1F
+	long BYTECODE_20
+	long BYTECODE_21
+	long BYTECODE_22
+	long BYTECODE_23
+	long BYTECODE_24
+	long BYTECODE_25
+	long BYTECODE_26
+	long BYTECODE_27
+	long BYTECODE_28
+	long BYTECODE_29
+	long BYTECODE_2A
+	long BYTECODE_2B
+	long BYTECODE_2C
+	long BYTECODE_2D
+	long BYTECODE_2E
+	long BYTECODE_2F
+	long BYTECODE_30
+	long BYTECODE_31
+	long BYTECODE_32
+	long BYTECODE_33
+	long BYTECODE_34
+	long BYTECODE_35
+	long BYTECODE_36
+	long BYTECODE_37
+	long BYTECODE_38
+	long BYTECODE_39
+	long BYTECODE_3A
+	long BYTECODE_3B
+	long BYTECODE_3C
+	long BYTECODE_3D
+	long BYTECODE_3E
+	long BYTECODE_3F
+	long BYTECODE_40
+	long BYTECODE_41
+	long BYTECODE_42
+	long BYTECODE_43
+	long BYTECODE_44
+	long BYTECODE_45
+	long BYTECODE_46
+	long BYTECODE_47
+	long BYTECODE_48
+	long BYTECODE_49
+	long BYTECODE_4A
+	long BYTECODE_4B
+	long BYTECODE_4C
+	long BYTECODE_4D
+	long BYTECODE_4E
+	long BYTECODE_4F
+	long BYTECODE_50
+	long BYTECODE_51
+	long BYTECODE_52
+	long BYTECODE_53
+	long BYTECODE_54
+	long BYTECODE_55
+	long BYTECODE_56
+	long BYTECODE_57
+	long BYTECODE_58
+	long BYTECODE_59
+	long BYTECODE_5A
+	long BYTECODE_5B
+	long BYTECODE_5C
+	long BYTECODE_5D
+	long BYTECODE_5E
+	long BYTECODE_5F
+	long BYTECODE_60
+	long BYTECODE_61
+	long BYTECODE_62
+	long BYTECODE_63
+	long BYTECODE_64
+	long BYTECODE_65
+	long BYTECODE_66
+	long BYTECODE_67
+	long BYTECODE_68
+	long BYTECODE_69
+	long BYTECODE_6A
+	long BYTECODE_6B
+	long BYTECODE_6C
+	long BYTECODE_6D
+	long BYTECODE_6E
+	long BYTECODE_6F
+	long BYTECODE_70
+	long BYTECODE_71
+	long BYTECODE_72
+	long BYTECODE_73
+	long BYTECODE_74
+	long BYTECODE_75
+	long BYTECODE_76
+	long BYTECODE_77
+	long BYTECODE_78
+	long BYTECODE_79
+	long BYTECODE_7A
+	long BYTECODE_7B
+	long BYTECODE_7C
+	long BYTECODE_7D
+	long BYTECODE_7E
+	long BYTECODE_7F
+}
+
+//+=+=+=+=+= BYTECODE MACROS =+=+=+=+=+
+command BAT_MACRO_LOAD_8BIT_PARAM(param_var) {
+	LDA_dl (PARSER_SCRIPT_PC_LO_ADDR)
+	INC_d (PARSER_SCRIPT_PC_LO_ADDR)
+	AND_i (0x00FF)
+	STA_d (param_var)
+}
+command BAT_MACRO_LOAD_16BIT_PARAM(param_var) {
+	LDA_dl (PARSER_SCRIPT_PC_LO_ADDR)
+	INC_d (PARSER_SCRIPT_PC_LO_ADDR)
+	INC_d (PARSER_SCRIPT_PC_LO_ADDR)
+	STA_d (param_var)
+}
+command BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(param_var, ae_offset) {
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (param_var)
+	ASL
+	CLC
+	ADC_i (ae_offset)
+	CLC
+	ADC_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+}
+command BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(param_var, ae_offset) {
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(param_var, ae_offset)
+	TAX
+	LDA_x (0x0000)
+	AND_i (0x00FF)
+}
+command BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(param_var, ae_offset) {
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(param_var, ae_offset)
+	TAX
+	LDA_x (0x0000)
+}
+command BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(lo_addr, hi_addr) {
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_VAR0_OFFSET)
+	STA_d (lo_addr)
+	LDA_x (AE_SCRIPT_VAR0_OFFSET)
+	STA_d (hi_addr)
+}
+//+=+=+=+=+= BYTECODE ASM =+=+=+=+=+
+// Halt's code execution (infinite loop)
+BYTECODE_00: {
+	BRA_a (BYTECODE_00)
+	JMP_l (Parser_Common_Return)
+}
+
+// Pause enemy's script for a set or variable amounts of time
+BYTECODE_01: {	
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	REP (0x20)
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BEQ_a (Pause_from_Value)
+	
+	REP (0x20)
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	BRA_a (Store_Frame_Count)
+	
+Pause_from_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	
+Store_Frame_Count:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_PAUSE_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Pause enemy's script by some amount from an address
+BYTECODE_02: {	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)	// Contains address for our value to pause
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_PAUSE_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Pause enemy's script by some amount from an address at var0 (LO) and var1 (HI)
+BYTECODE_03: {	
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	LDA_dl (PARSER_TEMP_VAR_1)	// Contains address for our value to pause
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_PAUSE_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)	
+}
+
+// Set result or var0 to var2 a value given in its parameters
+BYTECODE_04: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Set result or var0 to var2 a value from a memory address
+BYTECODE_05: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x0001)
+	BEQ_a (Store_16Bit_Value)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_16Bit_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Set result or var0 to var2 a value from a memory address stored
+// in var0 (LO) and var1 (HI)
+BYTECODE_06: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	REP (0x20)
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x0001)
+	BEQ_a (Store_16Bit_Value)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+Store_16Bit_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Copies data from one register to another
+BYTECODE_07: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Swaps data from one register to another
+BYTECODE_08: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	REP (0x20)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	TYX
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets a value to an address from the registers or a constant value
+BYTECODE_09: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using, if any
+	
+	REP (0x20)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address (LO)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)// Address (HI)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_5)// The value, if not using registers
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x0001)
+	BEQ_a (Using_16Bit)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	CMP_i (0x00FF)
+	BNE_a (Using_8Bit_Register)
+	
+Using_8Bit_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_5)
+	BRA_a (Store_8Bit_Value)
+	
+Using_8Bit_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	BRA_a (Store_8Bit_Value)
+	
+Using_16Bit:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	CMP_i (0x00FF)
+	BNE_a (Using_16Bit_Register)
+	
+Using_16Bit_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_5)
+	BRA_a (Store_16Bit_Value)
+	
+Using_16Bit_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	BRA_a (Store_16Bit_Value)
+	
+Store_8Bit_Value:
+	SEP (0x20)
+Store_16Bit_Value:
+	STA_dl (PARSER_BYTE_CODE_PARAM_3)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets a value to an address stored in var0 (LO) and var1 (HI) from the registers or a constant value
+BYTECODE_0A: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using, if any
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// The value, if not using registers
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x0001)
+	BEQ_a (Using_16Bit)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	CMP_i (0x00FF)
+	BNE_a (Using_8Bit_Register)
+	
+Using_8Bit_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	BRA_a (Store_8Bit_Value)
+
+Using_8Bit_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	BRA_a (Store_8Bit_Value)
+	
+Using_16Bit:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	CMP_i (0x00FF)
+	BNE_a (Using_16Bit_Register)
+
+Using_16Bit_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	BRA_a (Store_16Bit_Value)
+	
+Using_16Bit_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	BRA_a (Store_16Bit_Value)
+	
+Store_8Bit_Value:
+	SEP (0x20)
+Store_16Bit_Value:
+	STA_dl (PARSER_TEMP_VAR_1)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Adds a constant value to the result and var0 to var2 registers
+BYTECODE_0B: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	CLC
+	ADC_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+
+}
+
+// Adds a script register to the same or another register 
+BYTECODE_0C: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Adds a register and a data value from a memory address together
+BYTECODE_0D: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address to load data from
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+
+Using_16Bit:
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Adds a register and a data value from a memory addres stored in var0 (LO) and var1 (HI) 
+BYTECODE_0E: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+	
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_3)
+	BRA_a (Store_Value)
+
+Using_16Bit:
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+Store_Value:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	CLC
+	ADC_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_0F: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)// address to load the value from
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)// value to add from
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	SEP (0x20)
+	
+Using_16Bit:
+	LDA_dl (PARSER_BYTE_CODE_PARAM_2)
+	CLC
+	ADC_d (PARSER_BYTE_CODE_PARAM_4)
+	STA_dl (PARSER_BYTE_CODE_PARAM_2)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_10: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+	
+	REP (0x20)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// address to load from
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	AND_i (0x00FF)
+	
+Using_16Bit:
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	STA_dl (PARSER_BYTE_CODE_PARAM_3)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_11: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+	
+	REP (0x20)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Value 
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_2)
+	CMP_i (0x00FF)
+	BNE_a (Using_8Bit_Register)
+	
+Using_8Bit_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_3)
+	BRA_a (Store_8Bit_Value)
+	
+Using_8Bit_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_3)
+	BRA_a (Store_8Bit_Value)
+
+Using_16Bit:
+	LDY_d (PARSER_BYTE_CODE_PARAM_2)
+	CMP_i (0x00FF)
+	BNE_a (Using_16Bit_Register)
+	
+Using_16Bit_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_3)
+	BRA_a (Store_16Bit_Value)
+	
+Using_16Bit_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_3)
+	BRA_a (Store_16Bit_Value)
+
+Store_8Bit_Value:
+	SEP (0x20)
+Store_16Bit_Value:
+	LDA_dl (PARSER_TEMP_VAR_1)
+	CLC
+	ADC_d (PARSER_TEMP_VAR_3)
+	STA_dl (PARSER_TEMP_VAR_1)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_12: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	AND_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_13: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	AND_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_14: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Using_16Bit:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_15: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+	
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+Using_16Bit:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_16: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	
+	REP (0x20)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)// Value
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_2)
+	AND_d (PARSER_BYTE_CODE_PARAM_4)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	STA_dl (PARSER_BYTE_CODE_PARAM_2)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_17: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_d (PARSER_TEMP_VAR_1)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	STA_dl (PARSER_BYTE_CODE_PARAM_3)
+
+Return:
+	JMP_l (Parser_Common_Return)
+	
+}
+
+
+BYTECODE_18: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using, if any
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Value, if any
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_2)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	BRA_a (Store_Temp_Value)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+
+Store_Temp_Value:
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	LDA_dl (PARSER_TEMP_VAR_1)
+	AND_d (PARSER_TEMP_VAR_3)
+	STA_dl (PARSER_TEMP_VAR_1)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_19: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	ORA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_1A: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	ORA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_1B: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Using_16Bit:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	ORA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_1C: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+Using_16Bit:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	ORA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_1D: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)// Value
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_2)
+	ORA_d (PARSER_BYTE_CODE_PARAM_4)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	STA_dl (PARSER_BYTE_CODE_PARAM_2)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_1E: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	ORA_d (PARSER_TEMP_VAR_1)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	STA_dl (PARSER_BYTE_CODE_PARAM_3)
+
+Return:
+	JMP_l (Parser_Common_Return)
+	
+}
+
+
+BYTECODE_1F: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using, if any
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Value, if any
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_2)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	BRA_a (Store_Temp_Value)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+
+Store_Temp_Value:
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	LDA_dl (PARSER_TEMP_VAR_1)
+	ORA_d (PARSER_TEMP_VAR_3)
+	STA_dl (PARSER_TEMP_VAR_1)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_20: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	EOR_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_21: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_22: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Using_16Bit:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_23: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+	
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+Using_16Bit:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	EOR_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_24: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	
+	REP (0x20)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)// Value
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_2)
+	EOR_d (PARSER_BYTE_CODE_PARAM_4)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	STA_dl (PARSER_BYTE_CODE_PARAM_2)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_25: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Address
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	EOR_d (PARSER_TEMP_VAR_1)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	STA_dl (PARSER_BYTE_CODE_PARAM_3)
+
+Return:
+	JMP_l (Parser_Common_Return)
+	
+}
+
+
+BYTECODE_26: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)	// 8/16 bit addressing mode
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)	// what register we using, if any
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)// Value, if any
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_2)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	BRA_a (Store_Temp_Value)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+
+Store_Temp_Value:
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+Using_8Bit:
+	SEP (0x20)
+Using_16Bit:
+	LDA_dl (PARSER_TEMP_VAR_1)
+	EOR_d (PARSER_TEMP_VAR_3)
+	STA_dl (PARSER_TEMP_VAR_1)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_27: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_28: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	STA_x (PARSER_SCRIPT_PC_LO_ADDR)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_SCRIPT_PC_HI_ADDR)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_29: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	LDA_d (PARSER_SCRIPT_PC_LO_ADDR)
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_d (PARSER_SCRIPT_PC_HI_ADDR)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_RESULT_OFFSET)
+	
+	CPY_d (PARSER_BYTE_CODE_PARAM_1)
+	BCC_a (Load_JumpTable)
+	BEQ_a (Load_JumpTable)
+	
+Skip_JumpTable:
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	INC
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+	BRA_a (Return)
+
+Load_JumpTable:
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_PC_LO_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_2A: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	LDA_d (PARSER_SCRIPT_PC_LO_ADDR)
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_d (PARSER_SCRIPT_PC_HI_ADDR)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_RESULT_OFFSET)
+	
+	CPY_d (PARSER_BYTE_CODE_PARAM_1)
+	BCC_a (Load_JumpTable)
+	BEQ_a (Load_JumpTable)
+	
+Skip_JumpTable:
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	INC
+	ASL
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+
+Load_JumpTable:
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	ASL
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_PC_LO_OFFSET)
+	
+	INC_d (PARSER_TEMP_VAR_1)
+	INC_d (PARSER_TEMP_VAR_1)
+	LDA_dl (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_PC_HI_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_2B: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	CMP_d (PARSER_BYTE_CODE_PARAM_3)
+	BNE_a (Return)
+	
+Jump:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_2C: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	CMP_d (PARSER_BYTE_CODE_PARAM_3)
+	BEQ_a (Return)
+	
+Jump:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_2D: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	CMP_d (PARSER_BYTE_CODE_PARAM_3)
+	BCC_a (Return)
+	
+Jump:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+
+Return:
+	JMP_l (Parser_Common_Return)
+
+}
+
+BYTECODE_2E: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	CMP_d (PARSER_BYTE_CODE_PARAM_3)
+	BEQ_a (Return)
+	BCC_a (Return)
+	
+Jump:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_2F: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	CMP_d (PARSER_BYTE_CODE_PARAM_3)
+	BCS_a (Return)
+	
+Jump:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_SCRIPT_PC_LO_ADDR)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Gets the current frame of the enemy and returns it to the registers
+BYTECODE_30: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_31: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	BRA_a (Store_Frame_Count)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	
+Store_Frame_Count:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_32: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	SEP (0x20)
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_33: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	SEP (0x20)
+	LDA_dl (PARSER_TEMP_VAR_1)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Starts an enemy with a random frame of animation
+BYTECODE_34: {
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_ID_OFFSET)
+	ASL
+	ASL
+	ASL
+	CLC
+	ADC_i (ANIM_TABLE_MAX_FRAME_OFFSET)
+	TAX
+	LDA_xl (ANIM_TABLE_ADDR)
+	AND_i (0x00FF)
+	DEC
+	
+	JSL (RandModA)
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_35: {
+	LDA_i ({short[0] ANIM_TABLE_ADDR})
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_i ({short[1] ANIM_TABLE_ADDR})
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_ID_OFFSET)
+	ASL
+	ASL
+	ASL
+	CLC
+	ADC_i (ANIM_TABLE_MAX_FRAME_OFFSET)
+	TAY
+	
+	LDA_dly (PARSER_TEMP_VAR_1)
+	AND_i (0x00FF)
+	DEC
+	STA_d (PARSER_TEMP_VAR_3)
+
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	INC
+	CMP_d (PARSER_TEMP_VAR_3)
+	BCC_a (Store_Frame_Count)
+	BEQ_a (Store_Frame_Count)
+	
+Correct_Frame_Count:
+	LDA_8 (0x00)
+Store_Frame_Count:
+	STA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_36: {
+	LDA_i ({short[0] ANIM_TABLE_ADDR})
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_i ({short[1] ANIM_TABLE_ADDR})
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_ID_OFFSET)
+	ASL
+	ASL
+	ASL
+	CLC
+	ADC_i (ANIM_TABLE_MAX_FRAME_OFFSET)
+	TAY
+	
+	LDA_dly (PARSER_TEMP_VAR_1)
+	AND_i (0x00FF)
+	DEC
+	STA_d (PARSER_TEMP_VAR_3)
+
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	DEC
+	CMP_8 (0xFF)
+	BNE_a (Store_Frame_Count)
+	
+Correct_Frame_Count:
+	LDA_d (PARSER_TEMP_VAR_3)
+Store_Frame_Count:
+	STA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_37: {
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+
+	LDX_i (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PRIORITY_DRAW_BIT_ALL)
+	LSR
+	LSR
+	LSR
+	LSR
+	TAY
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	TYA
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_38: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x0003)
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x0003)
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_PRIORITY_DRAW_BIT_ALL)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_39: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x0003)
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_PRIORITY_DRAW_BIT_ALL)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_3A: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x0003)
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_PRIORITY_DRAW_BIT_ALL)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_3B: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BASE_XPOS_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_3C: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDA_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_XPOS_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_3D: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	STZ_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_XPOS_OFFSET)
+	AND_i (0xFF00)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (BATTLER_XPOS_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_3E: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_XPOS_OFFSET)
+	AND_i (0xFF00)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (BATTLER_XPOS_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_3F: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_XPOS_OFFSET)
+	AND_i (0xFF00)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (BATTLER_XPOS_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Gets the base y-position and stores it into a register
+BYTECODE_40: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+		
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BASE_YPOS_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+// Gets the current y-position and stores it into a register
+BYTECODE_41: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+		
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_YPOS_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Updates the enemy's y-position using registers or values
+BYTECODE_42: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_i (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_YPOS_OFFSET)
+	AND_i (0xFF00)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (BATTLER_YPOS_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Updates the enemy's y-position using an address 
+BYTECODE_43: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_YPOS_OFFSET)
+	AND_i (0xFF00)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (BATTLER_YPOS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Updates the enemy's y-position using an address in Var0 (LO) and Var1 (HI)
+BYTECODE_44: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_1, PARSER_TEMP_VAR_2)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_YPOS_OFFSET)
+	AND_i (0xFF00)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (BATTLER_YPOS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_45: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_46: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x0007)
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x0007)
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_8 (0x00)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_47: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x0007)
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_8 (0x00)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_48: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x0007)
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_8 (0x00)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_COOLDOWN_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_49: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_i (PARSER_BYTE_CODE_PARAM_1)
+	STA_x (AE_PALETTE_POINTER_LO_OFFSET)
+	LDA_i (PARSER_BYTE_CODE_PARAM_2)
+	SEP (0x20)
+	STA_x (AE_PALETTE_POINTER_HI_OFFSET)
+	
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_OAM_SPRITE_ID_OFFSET)
+	AND_i (0x00FF)
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	STA_d (PARSER_TEMP_VAR_1)
+	TAX
+	
+	LDY_i (0x0000)
+	
+Normal_Palette_Loop:
+	CPY_i (OAM_ENEMY_PALETTE_SIZE)
+	BEQ_a (Normal_Palette_Loop_End)
+	
+	LDA_dly (PARSER_BYTE_CODE_PARAM_1)
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	INY
+	INY
+	
+	BRA_a (Normal_Palette_Loop)
+	
+Normal_Palette_Loop_End:
+	LDA_d (PARSER_TEMP_VAR_1)
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDY_i (0x0000)
+	
+Dark_Palette_Loop:
+	CPY_i (OAM_ENEMY_PALETTE_SIZE)
+	BEQ_a (Return)
+	
+	LDA_dly (PARSER_BYTE_CODE_PARAM_1)
+	
+	LSR
+	LSR
+	AND_i (0x1CE7)	// Darken palette color 
+	
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	INY
+	INY
+	
+	BRA_a (Dark_Palette_Loop)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_4A: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_i (PARSER_TEMP_VAR_2)
+	STA_x (AE_PALETTE_POINTER_LO_OFFSET)
+	LDA_i (PARSER_TEMP_VAR_3)
+	SEP (0x20)
+	STA_x (AE_PALETTE_POINTER_HI_OFFSET)
+	
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_OAM_SPRITE_ID_OFFSET)
+	AND_i (0x00FF)
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	STA_d (PARSER_TEMP_VAR_1)
+	TAX
+	
+	LDY_i (0x0000)
+	
+Normal_Palette_Loop:
+	CPY_i (OAM_ENEMY_PALETTE_SIZE)
+	BEQ_a (Normal_Palette_Loop_End)
+	
+	LDA_dly (PARSER_TEMP_VAR_2)
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	INY
+	INY
+	
+	BRA_a (Normal_Palette_Loop)
+	
+Normal_Palette_Loop_End:
+	LDA_d (PARSER_TEMP_VAR_1)
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDY_i (0x0000)
+	
+Dark_Palette_Loop:
+	CPY_i (OAM_ENEMY_PALETTE_SIZE)
+	BEQ_a (Return)
+	
+	LDA_dly (PARSER_TEMP_VAR_2)
+	
+	LSR
+	LSR
+	AND_i (0x1CE7)	// Darken palette color 
+	
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	INY
+	INY
+	
+	BRA_a (Dark_Palette_Loop)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_4B: {
+	STX_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	REP (0x20)
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_i (AE_SCRIPT_SETTINGS_CYCLE_PALETTE_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)
+	EOR_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+
+}
+BYTECODE_4C: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_RATE_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_4D: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_RATE_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_4E: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_PALETTE_CYCLE_RATE_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_4F: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_HORIZONTAL_BIT)
+	LSR
+	LSR
+	LSR
+	LSR
+	LSR
+	LSR
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_50: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_HORIZONTAL_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_51: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_HORIZONTAL_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_52: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_HORIZONTAL_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_53: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_VERTICAL_BIT)
+	LSR
+	LSR
+	LSR
+	LSR
+	LSR
+	LSR
+	LSR
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_54: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_VERTICAL_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_55: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_VERTICAL_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_56: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_ATTRIBUTES_VERTICAL_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)	// Make filter to focus on this setting's bit
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)	// Use that filter
+	ORA_d (PARSER_TEMP_VAR_1)	// Then we set our settings
+	STA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_57: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	ASL
+	CLC
+	ADC_i (short[0] Load_Data_Addr_Table)
+	STA_a (RAM_JUMP_LO_ADDR)
+	PHK
+	PLA
+	AND_i (0x00FF)
+	STA_a (RAM_JUMP_HI_ADDR)
+	JMP_il (RAM_JUMP_LO_ADDR)
+	
+Load_8bit_Value:
+	LDX_d (PARSER_TEMP_VAR_1)
+	LDA_x (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_2)
+
+Load_16bit_Value:
+	LDX_d (PARSER_TEMP_VAR_1)
+	LDA_x (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_2)
+
+Store_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+	
+Load_Data_Addr_Table:
+	short Load_16bit_Value	// 0x00; Enemy Number
+	short Return	// 0x01
+	short Load_16bit_Value	// 0x02; Enemy Sprite
+	short Return	// 0x03
+	short Load_16bit_Value	// 0x04; Current Action
+	short Return	// 0x05
+	short Load_8bit_Value	// 0x06; Next Action (0-3 if sequential, 0-1 top bit if staggered)
+	short Load_8bit_Value	// 0x07; Action Input
+	short Load_16bit_Value	// 0x08; Action Input
+	short Load_8bit_Value	// 0x09; Targetting Type
+	short Load_8bit_Value	// 0x0A; Target
+	short Load_8bit_Value	// 0x0B; Enemy Letters
+	short Load_8bit_Value	// 0x0C; Batter Existance Boolean
+	short Load_8bit_Value	// 0x0D; Battler Already Acted Boolean
+	short Load_8bit_Value	// 0x0E; Battler Enemy Boolean
+	short Load_8bit_Value	// 0x0F; NPC Number for Party (0 if not NPC)
+	short Load_8bit_Value	// 0x10; Row ID / Character Number (PC)
+	short Load_16bit_Value	// 0x11; Rolling HP (Only updated when checked)
+	short Return	// 0x12
+	short Load_16bit_Value	// 0x13; Current HP
+	short Return	// 0x14
+	short Load_16bit_Value	// 0x15; Max HP
+	short Return	// 0x16
+	short Load_16bit_Value	// 0x17; Rolling PP (Only updated when checked)
+	short Return	// 0x18
+	short Load_16bit_Value	// 0x19; Current PP
+	short Return	// 0x1A
+	short Load_16bit_Value	// 0x1B; Max PP
+	short Return	// 0x1C
+	short Load_8bit_Value	// 0x1D; Permanent Status
+	short Load_8bit_Value	// 0x1E; Sprite Changing Status (Mushroomized/Possessed)
+	short Load_8bit_Value	// 0x1F; Battle Status
+	short Load_8bit_Value	// 0x20; Feeling Strange
+	short Load_8bit_Value	// 0x21; Can't Concentrate (Turn Duration)
+	short Load_8bit_Value	// 0x22; Homesickness
+	short Load_8bit_Value	// 0x23; Sheild Type (1 = PSI beta, 2 = PSI alpha, 3 = beta, 4 = alpha)
+	short Load_8bit_Value	// 0x24; Defending Boolean
+	short Load_8bit_Value	// 0x25; Shield Duration
+	short Load_8bit_Value	// 0x26; Offense 
+	short Return	// 0x27
+	short Load_16bit_Value	// 0x28; Defense
+	short Return	// 0x29
+	short Load_16bit_Value	// 0x2A; Speed
+	short Return	// 0x2B
+	short Load_16bit_Value	// 0x2C; Guts
+	short Return	// 0x2D
+	short Load_16bit_Value	// 0x2E; Luck
+	short Return	// 0x2F
+	short Load_8bit_Value	// 0x30; Vitality
+	short Load_8bit_Value	// 0x31; IQ
+	short Load_8bit_Value	// 0x32; Unmodified Offense
+	short Load_8bit_Value	// 0x33; Unmodified Defense
+	short Load_8bit_Value	// 0x34; Unmodified Speed
+	short Load_8bit_Value	// 0x35; Unmodified Guts
+	short Load_8bit_Value	// 0x36; Unmodified Luck
+	short Load_8bit_Value	// 0x37; Paralysis / Diamondization Weakness
+	short Load_8bit_Value	// 0x38; Freeze Weakness
+	short Load_8bit_Value	// 0x39; Flash Weakness
+	short Load_8bit_Value	// 0x3A; Fire Weakness
+	short Load_8bit_Value	// 0x3B; Brainshock Weakness
+	short Load_8bit_Value	// 0x3C; Hypnosis Weakness
+	short Load_16bit_Value	// 0x3D; Money Gained in Battle
+	short Return	// 0x3E
+	short Load_16bit_Value	// 0x3F; EXP Gained in Battle
+	short Return	// 0x40
+	short Return	// 0x41
+	short Return	// 0x42
+	short Load_8bit_Value	// 0x43; OAM Spritemap ID used for 0xAAD6 and 0xAABE
+	short Load_8bit_Value	// 0x44; X Position
+	short Load_8bit_Value	// 0x45; Y Position
+	short Load_16bit_Value	// 0x46; Effective Speed (Turn order, higher = more priority)
+	short Return	// 0x47
+	short Load_8bit_Value	// 0x48; Blinking Invisible Timer (when enemies get damaged)
+	short Load_8bit_Value	// 0x49; Blinking Black Timer 
+	short Load_8bit_Value	// 0x4A; Target for Attack Boolean (Blinks dark when target for attack)
+	short Load_8bit_Value	// 0x4B; Darken Sprite Boolean (Turns sprite dark)
+	short Load_16bit_Value	// 0x4C; Enemy ID for calling for back up
+	short Return	// 0x4D
+}
+
+
+BYTECODE_58: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	STA_d (PARSER_TEMP_VAR_1)
+
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	ASL
+	CLC
+	ADC_i (short[0] Load_Data_Addr_Table)
+	STA_a (RAM_JUMP_LO_ADDR)
+	PHK
+	PLA
+	AND_i (0x00FF)
+	STA_a (RAM_JUMP_HI_ADDR)
+	JMP_il (RAM_JUMP_LO_ADDR)
+	
+Store_8bit_Value:
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BNE_a (Store_8bit_Register)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	BRA_a (Store_8bit)
+	
+Store_8bit_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_2)
+
+Store_8bit:
+	SEP (0x20)
+	LDX_d (PARSER_TEMP_VAR_1)
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (PARSER_BYTE_CODE_PARAM_2)
+	BRA_a (Return)
+
+Store_16bit_Value:
+	LDY_d (PARSER_BYTE_CODE_PARAM_1)
+	CPY_i (0x00FF)
+	BNE_a (Store_8bit_Register)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	BRA_a (Store_8bit)
+	
+Store_16bit_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_2)
+
+Store_16bit:
+	LDX_d (PARSER_TEMP_VAR_1)
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (PARSER_BYTE_CODE_PARAM_2)
+
+Return:
+	JMP_l (Parser_Common_Return)
+
+Load_Data_Addr_Table:
+	short Store_16bit_Value	// 0x00; Enemy Number
+	short Return	// 0x01
+	short Store_16bit_Value	// 0x02; Enemy Sprite
+	short Return	// 0x03
+	short Store_16bit_Value	// 0x04; Current Action
+	short Return	// 0x05
+	short Store_8bit_Value	// 0x06; Next Action (0-3 if sequential, 0-1 top bit if staggered)
+	short Store_8bit_Value	// 0x07; Action Input
+	short Store_16bit_Value	// 0x08; Action Input
+	short Store_8bit_Value	// 0x09; Targetting Type
+	short Store_8bit_Value	// 0x0A; Target
+	short Store_8bit_Value	// 0x0B; Enemy Letters
+	short Store_8bit_Value	// 0x0C; Batter Existance Boolean
+	short Store_8bit_Value	// 0x0D; Battler Already Acted Boolean
+	short Store_8bit_Value	// 0x0E; Battler Enemy Boolean
+	short Store_8bit_Value	// 0x0F; NPC Number for Party (0 if not NPC)
+	short Store_8bit_Value	// 0x10; Row ID / Character Number (PC)
+	short Store_16bit_Value	// 0x11; Rolling HP (Only updated when checked)
+	short Return	// 0x12
+	short Store_16bit_Value	// 0x13; Current HP
+	short Return	// 0x14
+	short Store_16bit_Value	// 0x15; Max HP
+	short Return	// 0x16
+	short Store_16bit_Value	// 0x17; Rolling PP (Only updated when checked)
+	short Return	// 0x18
+	short Store_16bit_Value	// 0x19; Current PP
+	short Return	// 0x1A
+	short Store_16bit_Value	// 0x1B; Max PP
+	short Return	// 0x1C
+	short Store_8bit_Value	// 0x1D; Permanent Status
+	short Store_8bit_Value	// 0x1E; Sprite Changing Status (Mushroomized/Possessed)
+	short Store_8bit_Value	// 0x1F; Battle Status
+	short Store_8bit_Value	// 0x20; Feeling Strange
+	short Store_8bit_Value	// 0x21; Can't Concentrate (Turn Duration)
+	short Store_8bit_Value	// 0x22; Homesickness
+	short Store_8bit_Value	// 0x23; Sheild Type (1 = PSI beta, 2 = PSI alpha, 3 = beta, 4 = alpha)
+	short Store_8bit_Value	// 0x24; Defending Boolean
+	short Store_8bit_Value	// 0x25; Shield Duration
+	short Store_8bit_Value	// 0x26; Offense 
+	short Return	// 0x27
+	short Store_16bit_Value	// 0x28; Defense
+	short Return	// 0x29
+	short Store_16bit_Value	// 0x2A; Speed
+	short Return	// 0x2B
+	short Store_16bit_Value	// 0x2C; Guts
+	short Return	// 0x2D
+	short Store_16bit_Value	// 0x2E; Luck
+	short Return	// 0x2F
+	short Store_8bit_Value	// 0x30; Vitality
+	short Store_8bit_Value	// 0x31; IQ
+	short Store_8bit_Value	// 0x32; Unmodified Offense
+	short Store_8bit_Value	// 0x33; Unmodified Defense
+	short Store_8bit_Value	// 0x34; Unmodified Speed
+	short Store_8bit_Value	// 0x35; Unmodified Guts
+	short Store_8bit_Value	// 0x36; Unmodified Luck
+	short Store_8bit_Value	// 0x37; Paralysis / Diamondization Weakness
+	short Store_8bit_Value	// 0x38; Freeze Weakness
+	short Store_8bit_Value	// 0x39; Flash Weakness
+	short Store_8bit_Value	// 0x3A; Fire Weakness
+	short Store_8bit_Value	// 0x3B; Brainshock Weakness
+	short Store_8bit_Value	// 0x3C; Hypnosis Weakness
+	short Store_16bit_Value	// 0x3D; Money Gained in Battle
+	short Return	// 0x3E
+	short Store_16bit_Value	// 0x3F; EXP Gained in Battle
+	short Return	// 0x40
+	short Return	// 0x41
+	short Return	// 0x42
+	short Store_8bit_Value	// 0x43; OAM Spritemap ID used for 0xAAD6 and 0xAABE
+	short Store_8bit_Value	// 0x44; X Position
+	short Store_8bit_Value	// 0x45; Y Position
+	short Store_16bit_Value	// 0x46; Effective Speed (Turn order, higher = more priority)
+	short Return	// 0x47
+	short Store_8bit_Value	// 0x48; Blinking Invisible Timer (when enemies get damaged)
+	short Store_8bit_Value	// 0x49; Blinking Black Timer 
+	short Store_8bit_Value	// 0x4A; Target for Attack Boolean (Blinks dark when target for attack)
+	short Store_8bit_Value	// 0x4B; Darken Sprite Boolean (Turns sprite dark)
+	short Store_16bit_Value	// 0x4C; Enemy ID for calling for back up
+	short Return	// 0x4D
+}
+
+
+BYTECODE_59: {
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+// Stops the enmey's script execution permenantly
+BYTECODE_5A: {
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	ORA_8 (0x80)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Executes an ASM call to a routine using Result, Var0, and Var1 as A/X/Y respectively
+// When routine is called back, stores the result of the routine into the Result/var0/var1 register
+BYTECODE_5B: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	STA_a (RAM_JUMP_LO_ADDR)
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_a (RAM_JUMP_HI_ADDR)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_VAR1_OFFSET)
+	TAY
+	LDA_x (AE_SCRIPT_VAR0_OFFSET)
+	STA_d (PARSER_TEMP_VAR_3)
+	LDA_x (AE_SCRIPT_RESULT_OFFSET)
+	LDX_d (PARSER_TEMP_VAR_3)
+	
+	JSL (JSL_LongJump_00BC)
+	PHY
+	PHX
+	
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_RESULT_OFFSET)
+	PLA
+	STA_x (AE_SCRIPT_VAR0_OFFSET)
+	PLA
+	STA_x (AE_SCRIPT_VAR1_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+	
+}
+
+// Very similar to movscr_codes's b_unlock_text, although I'm not sure if this will work
+// in the same way, but leaving this here to see if it does or not.
+BYTECODE_5C: {
+	SEP (0x20)
+	LDA_8 (0x01)
+	STA_a (0x9641)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Returns a random number, either 8bit or 16bit depending on the parameter
+define RandModA = 0xC45F7B
+BYTECODE_5D: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	BNE_a (Using_16Bit)
+	
+	LDA_i (0x00FF)
+	BRA_a (Get_Random_Number)
+	
+Using_16Bit:
+	LDA_i (0xFFFF)
+
+Get_Random_Number:
+	JSL (RandModA)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_RESULT_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Toggles the flying settings, 0 = Off, 1 = On
+BYTECODE_5E: {
+	STZ_d (PARSER_TEMP_VAR_1)
+
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x0001)
+	BEQ_a (Turn_Off)
+	
+	LDA_i (AE_SCRIPT_SETTINGS_FLYING_BIT)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	ORA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	BRA_a (Return)
+	
+Turn_Off:
+	LDA_i (AE_SCRIPT_SETTINGS_FLYING_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_1)
+
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Gets the flying speed of the enemy into the registers
+BYTECODE_5F: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_FLYING_SPEED_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets the flying speed from a register or value
+BYTECODE_60: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_SPEED_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets the flying speed from an address location
+BYTECODE_61: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_SPEED_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets the flying speed from an address location stored in var0 (LO) and var1 (HI)
+BYTECODE_62: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_d (PARSER_TEMP_VAR_2)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_SPEED_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Store the flying height value to the registers
+BYTECODE_63: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_FLYING_HEIGHT_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets the flying height of the enemy from the registers or value
+BYTECODE_64: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_HEIGHT_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets the flying height of the enemy from an address
+BYTECODE_65: {
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_HEIGHT_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets the flying height of the enemy from an address in var0 (LO) and var1 (HI)
+BYTECODE_66: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+
+	LDA_d (PARSER_TEMP_VAR_2)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_HEIGHT_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Gets the flying counter to the registers
+BYTECODE_67: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	
+	SEP (0x20)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Sets the flying counter from the registers or value
+BYTECODE_68: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_69: {
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_6A: {
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x00FF)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+
+Store_Value:
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+// Set the flying counter to a random 8bit value 
+BYTECODE_6B: {
+	LDA_i (0x00FF)
+	JSL (RandModA)
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	STA_x (AE_SCRIPT_FLYING_COUNTER_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_6C: {
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_i (AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT)
+	BEQ_a (Check_Palette_Cycle_Loop_Use_Full_Palette)
+	
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	LSR
+	STA_d (PARSER_TEMP_VAR_4)
+	BRA_a (Check_Palette_Cycle_Loop_Init_2)
+	
+Check_Palette_Cycle_Loop_Use_Full_Palette:
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	STA_d (PARSER_TEMP_VAR_4)
+
+Check_Palette_Cycle_Loop_Init_2:
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	INC
+	INC		// Start on the 1st palette color, the 0th is the transparency
+	STA_d (PARSER_TEMP_VAR_1)
+	TAX
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	LDY_i (0x0004)
+
+Check_Palette_Cycle_Loop:
+	CPY_i (PARSER_TEMP_VAR_4)
+	BEQ_a (Check_Palette_Cycle_Loop_End)
+	
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0002)
+	LDA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	INY
+	INY
+	
+	BRA_a (Check_Palette_Cycle_Loop)
+	
+Check_Palette_Cycle_Loop_End:
+	LDA_d (PARSER_TEMP_VAR_1)
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	LDY_i (0x0004)
+	
+Check_Dark_Palette_Cycle_Loop:
+	CPY_i (PARSER_TEMP_VAR_4)
+	BEQ_a (Return)
+	
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0002)
+	LDA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	
+	INX
+	INX
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	INY
+	INY
+	
+	BRA_a (Check_Dark_Palette_Cycle_Loop)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_6D: {
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_i (AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT)
+	BEQ_a (Check_Palette_Cycle_Loop_Use_Full_Palette)
+	
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	LSR
+	STA_d (PARSER_TEMP_VAR_4)
+	BRA_a (Check_Palette_Cycle_Loop_Init_2)
+	
+Check_Palette_Cycle_Loop_Use_Full_Palette:
+	LDA_i (0)
+	STA_d (PARSER_TEMP_VAR_4)
+	
+Check_Palette_Cycle_Loop_Init_2:
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	CLC
+	ADC_i (OAM_ENEMY_PALETTE_SIZE)
+	SEC
+	SBC_d (PARSER_TEMP_VAR_4)
+	DEC
+	DEC
+	DEC
+	DEC		// Start on the 2nd to last palette color
+	STA_d (PARSER_TEMP_VAR_1)
+	TAX
+	
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	SEC
+	SBC_d (PARSER_TEMP_VAR_4)
+	TAY
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+
+Check_Palette_Cycle_Loop:
+	CPY_i (0x0004)
+	BEQ_a (Check_Palette_Cycle_Loop_End)
+	
+	LDA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0002)
+	
+	DEX
+	DEX
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	DEY
+	DEY
+	
+	BRA_a (Check_Palette_Cycle_Loop)
+	
+Check_Palette_Cycle_Loop_End:
+	LDA_d (PARSER_TEMP_VAR_1)
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	SEC
+	SBC_d (PARSER_TEMP_VAR_4)
+	TAY
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+Check_Dark_Palette_Cycle_Loop:
+	CPY_i (0x0004)
+	BEQ_a (Return)
+	
+	LDA_d (PARSER_TEMP_VAR_3)
+	STA_x (0x0000)
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0002)
+	
+	DEX
+	DEX
+	
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	LDA_x (0x0002)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	DEY
+	DEY
+	
+	BRA_a (Check_Dark_Palette_Cycle_Loop)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_6E: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_i (AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT)
+	LSR
+	LSR
+	LSR
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_6F: {
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BRA_a (Store_Value)
+
+Using_Register:
+	BAT_MACRO_8BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_2, AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)
+	ORA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_70:{
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)
+	ORA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_71:{
+	BAT_MACRO_COPY_ADDR_VAR01_TO_TEMP(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_dl (PARSER_TEMP_VAR_2)
+	AND_i (0x0001)
+	ASL
+	ASL
+	ASL
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDA_i (AE_SCRIPT_SETTINGS_USE_HALF_PALETTE_CYCLE_BIT)
+	EOR_i (0xFFFF)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	SEP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	AND_d (PARSER_TEMP_VAR_2)
+	ORA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_SETTINGS_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_72:{
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	AND_i (0x0003)
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_ENTRY_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x000F)
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_1)
+	TAX
+	LDA_x (0x0000)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_73:{
+	STZ_d (PARSER_TEMP_VAR_1)
+
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_4)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_4)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1)
+	ASL ASL ASL ASL ASL 
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1)
+	ASL ASL ASL ASL ASL 
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1) 
+	STA_d (PARSER_TEMP_VAR_1)
+
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	AND_i (0x0003)
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x000F)
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_3)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+	TXA
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDA_d (PARSER_TEMP_VAR_1)
+	LSR
+	LSR
+	AND_i (0x1CE7)	// Darken palette color 
+	
+	STA_x (0x0000)
+	
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_74:{
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	AND_i (0x0003)
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x000F)
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_3)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+	TXA
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDA_d (PARSER_TEMP_VAR_1)
+	LSR
+	LSR
+	AND_i (0x1CE7)	// Darken palette color 
+	
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_75:{
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	AND_i (0x0003)
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x000F)
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_3)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+	TXA
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDA_d (PARSER_TEMP_VAR_1)
+	LSR
+	LSR
+	AND_i (0x1CE7)	// Darken palette color 
+	
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_76:{
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_TEMP_VAR_2, PARSER_TEMP_VAR_3)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+Store_Value:
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_ATTRIBUTES_OFFSET)
+	AND_i (AE_SCRIPT_ATTRIBUTES_PALETTE_ID_ALL)
+	LSR
+	AND_i (0x0003)
+	TAY
+	LDA_i (OAM_ENEMY_PALETTE_SIZE)
+	JSL (Mul16x8r16)
+	CLC
+	ADC_i (OAM_NORMAL_ENEMY_PALETTE_ADDR)
+	STA_d (PARSER_TEMP_VAR_3)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	AND_i (0x000F)
+	ASL
+	CLC
+	ADC_d (PARSER_TEMP_VAR_3)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
+	
+	TXA
+	CLC
+	ADC_i (OAM_NORMAL_TO_DARK_PALETTE_DISTANCE)
+	TAX
+	
+	LDA_d (PARSER_TEMP_VAR_1)
+	LSR
+	LSR
+	AND_i (0x1CE7)	// Darken palette color 
+	
+	STA_x (0x0000)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_77:{
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_x (AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x001F)
+	ASL ASL ASL
+	STA_x (AE_SCRIPT_VAR0_OFFSET)
+	
+	LDA_x (AE_SCRIPT_RESULT_OFFSET)
+	LSR LSR LSR LSR LSR
+	AND_i (0x001F)
+	ASL ASL ASL
+	STA_x (AE_SCRIPT_VAR1_OFFSET)
+	
+	LDA_x (AE_SCRIPT_RESULT_OFFSET)
+	LSR LSR LSR LSR LSR LSR LSR LSR LSR LSR
+	AND_i (0x001F)
+	ASL ASL ASL
+	STA_x (AE_SCRIPT_VAR2_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_78:{
+	STZ_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1)
+	ASL ASL ASL ASL ASL 
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1)
+	ASL ASL ASL ASL ASL 
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1) 
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_RESULT_OFFSET)
+
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_79:{
+	STZ_d (PARSER_TEMP_VAR_1)
+	
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	
+	LDA_x (AE_SCRIPT_VAR2_OFFSET)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1)
+	ASL ASL ASL ASL ASL 
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_x (AE_SCRIPT_VAR1_OFFSET)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1)
+	ASL ASL ASL ASL ASL 
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_x (AE_SCRIPT_VAR0_OFFSET)
+	LSR LSR LSR
+	ORA_d (PARSER_TEMP_VAR_1)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (AE_SCRIPT_RESULT_OFFSET)
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+BYTECODE_7A:{
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_7B:{
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_7C:{
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_7D:{
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_7E:{
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+BYTECODE_7F:{
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}
+
+
+// Common code that updates the script's PC and returns
+Parser_Common_Return: {
+	REP (0x20)
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	
+	LDA_d (PARSER_SCRIPT_PC_LO_ADDR)
+	STA_x (AE_SCRIPT_PC_LO_OFFSET)
+	
+	LDA_d (PARSER_SCRIPT_PC_HI_ADDR)
+	SEP (0x20)
+	STA_x (AE_SCRIPT_PC_HI_OFFSET)
+	
+	REP (0x20)
+	
+	RTL
+}
+
+/*
+	* TECHNICAL NOTES *
+	-------------------
+
+	In the same vein as movscr_codes.ccs, we will write this for enemy battle sprites
+	* 0xA21C is the start of the enemy's battler data values 
+	* 0xAAD6 holds the sprite's OAM data values
+
+		1.1. SCRIPT CONTROL INSTRUCTIONS
+		b_halt
+		b_pause()
+		b_pause_result
+		b_pause_var0-2
+		
+		1.2. DATA MOVEMENT INSTRUCTIONS
+		b_set_var0-2()
+		b_set_result()
+		b_rtovar0-2
+		b_get_var0-2
+		b_get_mem8(addr)
+		b_get_mem16(addr)
+		b_set_mem8(addr, value)
+		b_set_mem16(addr, value)
+		
+		b_get_mem8_long(addr)
+		b_get_mem8_var01
+		b_set_mem8_var01(value)
+		b_set_mem8_var01_result
+		
+		b_get_mem16_long(addr)
+		b_get_mem16_var01
+		b_set_mem16_var01(value)
+		b_set_mem16_var01_result
+		
+		
+		1.3. ARITHMETIC AND LOGICAL INSTRUCTIONS
+		// add, and, or, xor	
+		b_op_result(value)
+		b_op_var0-2(value)
+		b_op_mem8(addr, value)
+		b_op_mem16(addr, value)
+		
+		b_op_result_var0-2
+		b_op_var0-2_result
+		b_op_mem8_result(addr)
+		b_op_mem16_result(addr)
+		b_op_mem8_var0-2(addr)
+		b_op_mem16_var0-2(addr)
+		
+		1.4. CONTROL FLOW INSTRUCTIONS
+		b_jmp(address)
+		b_jml(address)
+		b_multijmp(amount)
+		b_jeq(address)
+		b_jne(address)
+		// b_jsr(address)
+		// b_jsl(address)
+		// m_multijsr(amount)
+		// b_rts
+		// b_rtl
+		
+		1.5. LOOP INSTRUCTIONS
+		b_loop(count)
+		b_loop_result
+		m_endloop
+		m_breakeq(address)
+		m_breakne(address)
+		
+		1.6. TASK INSTRUCTIONS
+		// b_task(address)
+		// b_task_long(address)
+		// b_endtask
+		// b_endlasttask
+		
+		1.7. CALLBACK INSTRUCTIONS
+		// b_ontick(address)
+		// b_ontick_nop
+		// b_ondraw(address)
+		// b_onposition(address)
+		// b_onmove(address)
+		// b_ondestory(address)
+		
+		1.8. SPRITE INSTRUCTIONS
+		// b_set_spritemap(address)
+		b_set_anim(value)
+		b_set_anim_var0-2
+		b_add_anim(value)
+		b_inc_anim
+		b_dec_anim
+		b_priority(value)
+		b_set_xpos(value)
+		b_set_ypos(value)
+		// b_set_zpos(value)
+		b_add_xpos(value)
+		b_add_ypos(value)
+		// b_add_zpos(value)
+		// b_set_xvel(value)
+		// b_set_yvel(value)
+		// b_set_zvel(value)
+		// b_add_xvel(value)
+		// b_add_yvel(value)
+		// b_add_zvel(value)
+		// b_zerovel
+		
+		b_set_xpos_result
+		b_set_xpos_var0-2
+		b_add_xpos_result
+		b_add_xpos_var0-2
+		b_set_ypos_result
+		b_set_ypos_var0-2
+		b_add_ypos_result
+		b_add_ypos_var0-2
+		
+		b_set_palette(value)
+		b_set_palette_result
+		b_set_palette_var0-2
+		b_get_palette
+		b_new_palette(address)
+		b_new_palette_var01
+		
+		b_set_palette_cycle(0 or 1)
+		b_set_palette_cycle_rate(value)
+		b_set_palette_cycle_rate_result
+		b_set_palette_cycle_rate_var0-2
+		b_cycle_palette
+		
+		b_flip_horizontal(0 or 1)
+		b_flip_vertical(0 or 1)
+		
+		1.9. OTHER INSTRUCTIONS
+		b_end
+		b_asmcall(address)
+		b_store_result
+		b_load_result
+		
+		
+		
+		
+	struct AnimateEnemyList {
+		AnimateEnemyEntry list[8]
+		byte OAM_Scratch[80]
+	} new_AnimateEnemyList = {[null x8]; [0x00 x 80]};
+	
+	struct AnimateEnemyEntry {
+		short battler_addr;
+		adr24 void* palette_addr;
+		adr24 void* Script_PC;
+		short result;
+		short var0;
+		short var1;
+		short var2;
+		byte base_xpos;
+		byte base_ypos;
+		byte current_frame;
+		byte pause_frames;
+		byte palette_cycle_rate;
+		byte palette_cycle_cooldown;
+		byte flying_height;
+		byte flying_speed;
+		byte flying_counter;
+		byte attributes; 		// 0bVHPP CCCt
+								//   |||| ||||
+								//   |||| |||- HI OAM
+								//   |||| ||-- Color (LO)
+								//   |||| |--- Color (MED)
+								//   |||| ---- Color (HI)
+								//   ||||
+								//   |||------ Priority Draw (LO)
+								//   ||------- Priority Draw (HI) 
+								//   |-------- Horizontal Flip
+								//   --------- Vertical Flip
+		
+		
+		byte setting_toggle;	// 0bKSFP H000
+								//   |||| ||||
+								//   |||| |||- 
+								//   |||| ||-- 
+								//   |||| |--- 
+								//   |||| ---- Toggle Half Palette to Cycle
+								//   ||||
+								//   |||------ Toggle to Cycle Palettes
+								//   ||------- Toggle Flying
+								//   |-------- Soft toggle, enables/disables the script
+								//   --------- Kill switch, turns the animation off (b_end)
+		
+		
+	}
+	
+	https://snes.nesdev.org/wiki/Sprites
+	struct OAM_Spritemap {
+		byte y_pos;
+		byte tile;	// size 32x32; 0xYX, Y = 8 pixel down, X = 8 pixel right
+		byte attr;			// 0bVHPP CCCt
+							// V = Vertical Flip
+							// H = Horizontal Flip 
+							// PP = Priority Draw
+							// CCC = Palette ID on CGRAM
+							// t = High bit of tile of OAM
+							//		It's basically a bit that changes the 128x128 section of OAM
+							//		to use either the lower or higher 128x128 sections of OAM
+							// 		It makes sense if you were to add the tiles together since the
+							//		carry bit of the addition goes to that "t" bit
+		byte x_pos;
+		byte toggle-size	// 0xTS
+							// T (0x80 or 0x00) = Toggles drawing or stoping OAM draw tiles
+							// S (0x00 or 0x01) = 16x16 or 32x32 sprite size	
+	}
+*/
