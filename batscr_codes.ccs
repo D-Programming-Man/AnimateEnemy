@@ -225,6 +225,11 @@ import AnimateEnemy_Main
 	I'll also try to give each command their own descriptions soon, but for now I just wanna
 	put this script out there before Jank Jam 2 starts so that people can explore and experiment
 	with this first.
+	
+	WARNING:	DO NOT USE THE ENEMY EXTENDER BATTLE ACTION, IT WILL MESS UP THE IDs OF THE
+				ENEMY AND THE CODE WILL TRY TO OVERWRITE TONS OF GARBAGE DATA IN RAM.
+				YOU HAVE BEEN WARNED!!!!
+				
 */
 
 //+=+=+=+=+= COMMANDS =+=+=+=+=+
@@ -825,8 +830,13 @@ command b_asmcall(addr)		{"[5B {long addr}]"}
 
 // Utilities from movscr_codes
 command b_unlock_text		{"[5C]"}
-command b_rand_8bit			{"[5D 00]"}
-command b_rand_16bit		{"[5D 01]"}
+command b_rand_8bit			{"[5D 00 00 FF 00]"}
+command b_rand_16bit		{"[5D 01 00 FF FF]"}
+
+command b_rand_result(value)	{"[5D 02 00 {short value}]"}
+command b_rand_var0(value)		{"[5D 02 01 {short value}]"}
+command b_rand_var1(value)		{"[5D 02 02 {short value}]"}
+command b_rand_var2(value)		{"[5D 02 03 {short value}]"}
 
 command b_toggle_flying(value)		{"[5E {short value}]"}
 
@@ -910,6 +920,20 @@ command b_seperate_RGB_var012	{"[77]"}
 command b_combine_RGB(red, green, blue)	{"[78 {byte red} {byte green} {byte blue}]"}
 command b_combine_RGB_var012	{"[79]"}
 
+command b_get_flag_result(flag_id)	{"[7A 00 {short flag_id}]"}
+command b_get_flag_var0(flag_id)	{"[7A 01 {short flag_id}]"}
+command b_get_flag_var1(flag_id)	{"[7A 02 {short flag_id}]"}
+command b_get_flag_var2(flag_id)	{"[7A 03 {short flag_id}]"}
+
+command b_set_flag(flag_id, value)			{"[7B FF {short flag_id} {byte value}]"}
+command b_set_flag_result(flag_id)			{"[7B 00 {short flag_id} 00]"}
+command b_set_flag_var0(flag_id)			{"[7B 01 {short flag_id} 00]"}
+command b_set_flag_var1(flag_id)			{"[7B 02 {short flag_id} 00]"}
+command b_set_flag_var2(flag_id)			{"[7B 03 {short flag_id} 00]"}
+command b_set_flag_mem8(flag_id, addr)		{"[7C {short flag_id} {short addr} 7E 00]"}
+command b_set_flag_mem8_long(flag_id, addr)	{"[7C {short flag_id} {long addr}]"}
+command b_set_flag_mem8_var01(flag_id)		{"[7D {short flag_id}]"}
+
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 //+=+=+=+=+= ASM =+=+=+=+=+
@@ -936,6 +960,29 @@ ROM[0xC2F544] = {
 	JSL (BAT_Animate_Enemy_Init)
 	NOP
 }
+
+// "Call For Help" and "Sow Seeds" Battle Action routines
+ROM[0xC2C114] = {
+	JSL (Enemy_Backup_Init_Enemy_Animation)
+	
+}
+
+ROM[0xC2C1B3] = {
+	JSL (Rainbow_of_Colors_Battle_Action_Fix)
+	NOP
+}
+
+/*
+	This needs to free up the space from the ANIMATE_ENEMY_LIST_ADDR at the end of battle.
+	BowsprBattleSystem also has this modification as well, so if you deecide to use both
+	scripts, just copy this ASM code to BowsprBattleSystem script file.
+	
+	Look for the "Clean_Up" label in the BowsprBattleSystem script, it should be all the way down at the end of the file
+*/
+ROM[0xC26185] = {
+	JML (BAT_End_of_Battle_Free_AE)
+}
+
 
 /*
 	Entry point for the script to do all fancy stuff for the enemy sprites
@@ -1014,6 +1061,14 @@ BAT_Parsesr: {
 	PHX		// xpos of the sprite
 	PHA		// Address of the OAM Spritemap
 	
+	LDX_d (0x02)
+	LDA_x (BATTLER_ID_OFFSET)
+	CMP_i (0x0000)
+	BEQ_a (OldCode)			// Instance where the ID of the enemy becomes 0, happens during when an enemy
+							// does the battle enemy extender battle action when you set the action
+							// argument to enemy ID 0 and the BTLACT_RAINBOW battle action, like when
+							// you kill Carbon Dog and it transforms into Diamond Dog
+	
 	LDA_d (0x02)
 	JSL (BAT_FindEntryAddr)
 	CMP_i (0xFFFF)
@@ -1083,6 +1138,10 @@ BAT_Parsesr: {
 	BRA_a (OldCode)	// No defined sprite size for this enemy
 	
 	Is_SIZE_32x32:
+		LDA_d (BAT_P_VAR2)
+		CMP_d (BAT_P_VAR4)
+		BEQ_a (Update_Spritemap_Attr)	// If the same sprite and canvas size
+		
 		LDX_d (BAT_P_VAR3)
 		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
 		AND_i (0x00FF)
@@ -1095,6 +1154,10 @@ BAT_Parsesr: {
 		
 	
 	Is_SIZE_64x32:
+		LDA_d (BAT_P_VAR2)
+		CMP_d (BAT_P_VAR4)
+		BEQ_a (Update_Spritemap_Attr)	// If the same sprite and canvas size
+		
 		LDX_d (BAT_P_VAR3)
 		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
 		AND_i (0x00FF)
@@ -1106,6 +1169,10 @@ BAT_Parsesr: {
 		BRA_a (Update_Spritemap_Attr)
 	
 	Is_SIZE_32x64:
+		LDA_d (BAT_P_VAR2)
+		CMP_d (BAT_P_VAR4)
+		BEQ_a (Update_Spritemap_Attr)	// If the same sprite and canvas size
+	
 		LDX_d (BAT_P_VAR3)
 		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
 		AND_i (0x00FF)
@@ -1117,6 +1184,10 @@ BAT_Parsesr: {
 		BRA_a (Update_Spritemap_Attr)
 	
 	Is_SIZE_64x64:
+		LDA_d (BAT_P_VAR2)
+		CMP_d (BAT_P_VAR4)
+		BEQ_a (Update_Spritemap_Attr)	// If the same sprite and canvas size
+	
 		LDX_d (BAT_P_VAR3)
 		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
 		AND_i (0x00FF)
@@ -1129,6 +1200,10 @@ BAT_Parsesr: {
 		
 		
 	Is_SIZE_128x64:
+		LDA_d (BAT_P_VAR2)
+		CMP_d (BAT_P_VAR4)
+		BEQ_a (Update_Spritemap_Attr)	// If the same sprite and canvas size
+	
 		LDX_d (BAT_P_VAR3)
 		LDA_x (AE_SCRIPT_CURRENT_FRAME_OFFSET)
 		AND_i (0x00FF)
@@ -1630,6 +1705,37 @@ OldCode:
 	RTL
 }
 
+define BuildTargetName = 0xC23D05
+Enemy_Backup_Init_Enemy_Animation: {
+	JSL (BuildTargetName)
+	LDA_a (0xA972)		// Load current battler target address (new enemy)
+	JSL (Batscr_Init)
+	RTL
+}
+
+Rainbow_of_Colors_Battle_Action_Fix: {
+	REP (0x20)
+	LDA_a (0xA970)
+	JSL (BAT_FindEntryAddr)
+	CMP_i (0xFFFF)
+	BEQ_a (OldCode)
+	
+	TAX
+	STZ_x (0x0000)		// Store 0 into the Animation Entry's enemy address pointer to clear it
+						// Easy way to denote that this is a free entry to use to replace everything
+						// In here
+					
+	LDA_a (0xA970)
+	JSL (Batscr_Init)	// Re-initialize the Animated Enemy's data with the new enemy
+	
+	// Old Code
+OldCode:
+	REP (0x20)
+	LDA_i (0x0001)
+	
+	RTL
+}
+
 /*
 	Finds the enemy's index into the AnimateEnemy list
 	Param: A = Enemy's Battler's Address
@@ -1732,11 +1838,21 @@ Return:
 	Return: A = Address of that entry
 				Returns 0xFFFF if there is none
 */
+define BATTLER_PERM_STAT_OFFSET = 0x1D
 BAT_FindFreeEntry: {
+	REP (0x31)
+	PHD
+	TDC
+	ADC_i (0xFFEE)
+	TCD
+	
 	LDY_i (MAX_ENEMIES)
 	LDX_i (ANIMATE_ENEMY_LIST_ADDR)
+	STX_d (0x02)
 	
 Loop:
+	LDX_d (0x02)
+	
 	LDA_x (AE_SCRIPT_BATTLER_ADDR)
 	BEQ_a (Return)
 	
@@ -1744,22 +1860,47 @@ Loop:
 	AND_i (0x0080)	// IF killswitch is on, then overwrite this entry
 	BNE_a (Return)
 	
-	TXA
+	LDA_x (AE_SCRIPT_BATTLER_ADDR)
+	TAX
+	LDA_x (BATTLER_PERM_STAT_OFFSET)
+	AND_i (0x00FF)
+	CMP_i (0x0001)
+	BEQ_a (Return)	// If a previous animated enemy is dead, then overwrite this entry
+	
+	LDA_d (0x02)
 	CLC
 	ADC_i (ANIMATE_ENEMY_ENTRY_SIZE)
-	TAX
+	STA_d (0x02)
 	
 	DEY
 	CPY_i (0x0000)
 	BNE_a (Loop)
 	
-	LDX_i (0xFFFF)
+	LDA_i (0xFFFF)
+	STA_d (0x02)
 	
 Return:
-	TXA
+	LDA_d (0x02)
+	PLD
 	RTL
 }
 
+BAT_End_of_Battle_Free_AE: {
+	LDX_i (ANIMATE_ENEMY_LIST_ADDR)
+	LDA_i (0)
+	
+Loop:
+	STA_x (0x0000)
+	INX
+	INX
+	CPX_i (0x0800)
+	BNE_a (Loop)
+	
+	// Old Code, do not copy this to BowsprBattleSystem. Copy everything above
+	LDA_d (0x17)
+	PLD
+	RTL
+}
 
 /*
 	This initializes each enemy into the Animate Enemy List
@@ -2425,6 +2566,7 @@ ByteCodeJumpTable: {
 	long BYTECODE_7D
 	long BYTECODE_7E
 	long BYTECODE_7F
+	long BYTECODE_80
 }
 
 //+=+=+=+=+= BYTECODE MACROS =+=+=+=+=+
@@ -4299,7 +4441,7 @@ BYTECODE_46: {
 	BNE_a (Using_Register)
 	
 Using_Value:
-	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
 	AND_i (0x0007)
 	ASL
 	STA_d (PARSER_TEMP_VAR_1)
@@ -5263,24 +5405,41 @@ Return:
 define RandModA = 0xC45F7B
 BYTECODE_5D: {
 	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_2)
 	
 	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
 	
 	LDA_d (PARSER_BYTE_CODE_PARAM_1)
 	BNE_a (Using_16Bit)
 	
-	LDA_i (0x00FF)
+	STZ_d (PARSER_TEMP_VAR_1)
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
 	BRA_a (Get_Random_Number)
 	
 Using_16Bit:
-	LDA_i (0xFFFF)
+	CMP_i (0x0002)
+	BEQ_a (Rand_Limit)
 
+	STZ_d (PARSER_TEMP_VAR_1)
+	LDA_i (PARSER_BYTE_CODE_PARAM_3)
+	BRA_a (Get_Random_Number)
+	
+Rand_Limit:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	
 Get_Random_Number:
 	JSL (RandModA)
+	STA_d (PARSER_TEMP_VAR_2)
 	
-	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
-	STA_x (AE_SCRIPT_RESULT_OFFSET)
-
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_2)
+	STA_x (0x0000)
+	
 Return:
 	JMP_l (Parser_Common_Return)
 }
@@ -6259,38 +6418,92 @@ Return:
 	JMP_l (Parser_Common_Return)
 }
 
-
+define GetEventFlag = 0xC21628
+define SetEventFlag = 0xC2165E
 BYTECODE_7A:{
-	NOP
-	NOP
-	NOP
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	JSL (GetEventFlag)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	BAT_MACRO_AE_GET_OFFSET_ADDR_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	TAX
+	LDA_d (PARSER_TEMP_VAR_1)
+	STA_x (0x0000)
 	
 Return:
 	JMP_l (Parser_Common_Return)
 }
 
 BYTECODE_7B:{
-	NOP
-	NOP
-	NOP
+	STZ_d (PARSER_BYTE_CODE_PARAM_1)
+	STZ_d (PARSER_BYTE_CODE_PARAM_3)
+	
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_8BIT_PARAM(PARSER_BYTE_CODE_PARAM_3)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	CMP_i (0x00FF)
+	BNE_a (Using_Register)
+	
+Using_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_3)
+	AND_i (0x0001)
+	STA_d (PARSER_TEMP_VAR_1)
+	BRA_a (Store_Value)
+	
+Using_Register:
+	BAT_MACRO_16BIT_AE_GET_DATA_USING_PARAM(PARSER_BYTE_CODE_PARAM_1, AE_SCRIPT_RESULT_OFFSET)
+	AND_i (0x0001)
+	STA_d (PARSER_TEMP_VAR_1)
+
+Store_Value:
+	LDA_d (PARSER_BYTE_CODE_PARAM_2)
+	LDX_d (PARSER_TEMP_VAR_1)
+	JSL (SetEventFlag)
 	
 Return:
 	JMP_l (Parser_Common_Return)
 }
 
 BYTECODE_7C:{
-	NOP
-	NOP
-	NOP
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_2)
+	
+	LDA_dl (PARSER_BYTE_CODE_PARAM_2)
+	AND_i (0x0001)
+	STA_d (PARSER_TEMP_VAR_1)
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	LDX_d (PARSER_TEMP_VAR_1)
+	JSL (SetEventFlag)
 	
 Return:
 	JMP_l (Parser_Common_Return)
 }
 
 BYTECODE_7D:{
-	NOP
-	NOP
-	NOP
+	BAT_MACRO_LOAD_16BIT_PARAM(PARSER_BYTE_CODE_PARAM_1)
+
+	LDX_d (PARSER_ANIMATE_ENEMY_ENTRY_ADDR)
+	
+	LDA_x (AE_SCRIPT_VAR0_OFFSET)
+	STA_d (PARSER_TEMP_VAR_1)
+	LDA_x (AE_SCRIPT_VAR1_OFFSET)
+	STA_d (PARSER_TEMP_VAR_2)
+	
+	LDA_dl (PARSER_TEMP_VAR_1)
+	AND_i (0x0001)
+	TAX
+	
+	LDA_d (PARSER_BYTE_CODE_PARAM_1)
+	JSL (SetEventFlag)
 	
 Return:
 	JMP_l (Parser_Common_Return)
@@ -6314,6 +6527,14 @@ Return:
 	JMP_l (Parser_Common_Return)
 }
 
+BYTECODE_80:{
+	NOP
+	NOP
+	NOP
+	
+Return:
+	JMP_l (Parser_Common_Return)
+}	
 
 // Common code that updates the script's PC and returns
 Parser_Common_Return: {
